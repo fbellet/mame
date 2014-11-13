@@ -167,7 +167,7 @@ void thomson_state::thom_set_lightpen_callback( int nb )
 	m_thom_lightpen_nb = nb;
 }
 
-TIMER_CALLBACK_MEMBER( thomson_state::thom_lightpen_step )
+void thomson_state::thom_lightpen_step_timer_func (int param)
 {
 	int step = param;
 
@@ -831,7 +831,7 @@ static const thom_scandraw thom_scandraw_funcs[THOM_VMODE_NB][2] =
 /* called at the start of each scanline in the active area, just after
    left border (-1<=y<199), and also after the last scanline (y=199)
 */
-TIMER_CALLBACK_MEMBER( thomson_state::thom_scanline_start )
+void thomson_state::thom_scanline_start_timer_func (int param)
 {
 	int y = param;
 
@@ -1026,10 +1026,10 @@ uint32_t thomson_state::screen_update_thom(screen_device &screen, bitmap_ind16 &
 /* -------------- frame start ------------------ */
 
 
-TIMER_CALLBACK_MEMBER( thomson_state::thom_set_init )
+void thomson_state::thom_set_init_timer_func (int param)
 {
 	int init = param;
-	LOG("%f thom_set_init: %i, at line %i col %i\n", machine().time().as_double(), init, thom_video_elapsed() / 64, thom_video_elapsed() % 64);
+	LOG("%f thom_set_init_timer_func: %i, at line %i col %i\n", machine().time().as_double(), init, thom_video_elapsed() / 64, thom_video_elapsed() % 64 );
 
 	if ( m_thom_init_cb )
 		(this->*m_thom_init_cb)( init );
@@ -1164,17 +1164,17 @@ void thomson_state::video_start()
 
 	m_caps_led.resolve();
 
-	m_thom_video_timer = machine().scheduler().timer_alloc(timer_expired_delegate());
+	m_thom_video_timer = timer_alloc(TIMER_NULL);
 
-	m_thom_scanline_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(thomson_state::thom_scanline_start),this));
+	m_thom_scanline_timer = timer_alloc(TIMER_THOM_SCANLINE_START);
 
 	m_thom_lightpen_nb = 0;
 	m_thom_lightpen_cb = nullptr;
-	m_thom_lightpen_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(thomson_state::thom_lightpen_step),this));
+	m_thom_lightpen_timer = timer_alloc(TIMER_THOM_LIGHTPEN_STEP);
 	save_item(NAME(m_thom_lightpen_nb));
 
 	m_thom_init_cb = nullptr;
-	m_thom_init_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(thomson_state::thom_set_init),this));
+	m_thom_init_timer = timer_alloc(TIMER_THOM_SET_INIT);
 
 	m_thom_bwidth = 0;
 	m_thom_bheight = 0;

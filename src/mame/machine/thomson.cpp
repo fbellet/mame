@@ -831,9 +831,7 @@ WRITE_LINE_MEMBER( thomson_state::to7_game_cb2_out )
 }
 
 
-
-/* this should be called periodically */
-TIMER_CALLBACK_MEMBER(thomson_state::to7_game_update_cb)
+void thomson_state::to7_game_update_timer_func()
 {
 	if ( m_io_config->read() & 1 )
 	{
@@ -867,7 +865,7 @@ TIMER_CALLBACK_MEMBER(thomson_state::to7_game_update_cb)
 void thomson_state::to7_game_init()
 {
 	LOG (( "to7_game_init called\n" ));
-	m_to7_game_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(thomson_state::to7_game_update_cb),this));
+	m_to7_game_timer = timer_alloc(TIMER_TO7_GAME_UPDATE);
 	m_to7_game_timer->adjust(TO7_GAME_POLL_PERIOD, 0, TO7_GAME_POLL_PERIOD);
 	save_item(NAME(m_to7_game_sound));
 	save_item(NAME(m_to7_game_mute));
@@ -1272,7 +1270,7 @@ void mo5_state::mo5_lightpen_cb( int step )
 */
 
 
-TIMER_CALLBACK_MEMBER(thomson_state::mo5_periodic_cb)
+void thomson_state::mo5_periodic_timer_func()
 {
 	/* pulse */
 	m_pia_sys->cb1_w( 1 );
@@ -1597,7 +1595,7 @@ MACHINE_START_MEMBER( mo5_state, mo5 )
 	to7_game_init();
 	to7_modem_init();
 	to7_midi_init();
-	m_mo5_periodic_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(mo5_state::mo5_periodic_cb),this));
+	m_mo5_periodic_timer = timer_alloc(TIMER_MO5_PERIODIC);
 
 	m_extension->rom_map(m_maincpu->space(AS_PROGRAM), 0xa000, 0xa7bf);
 	m_extension->io_map (m_maincpu->space(AS_PROGRAM), 0xa7d0, 0xa7df);
@@ -2344,7 +2342,7 @@ int to9_state::to9_kbd_get_key()
 
 
 
-TIMER_CALLBACK_MEMBER(to9_state::to9_kbd_timer_cb)
+void to9_state::to9_kbd_timer_func()
 {
 	if ( m_to9_kbd_periph )
 	{
@@ -2423,7 +2421,7 @@ void to9_state::to9_kbd_reset()
 void to9_state::to9_kbd_init()
 {
 	LOG(( "to9_kbd_init called\n" ));
-	m_to9_kbd_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(to9_state::to9_kbd_timer_cb),this));
+	m_to9_kbd_timer = timer_alloc(TIMER_TO9_KBD);
 	save_item(NAME(m_to9_kbd_parity));
 	save_item(NAME(m_to9_kbd_intr));
 	save_item(NAME(m_to9_kbd_in));
@@ -2782,13 +2780,6 @@ void to9_state::to8_kbd_timer_func()
 
 
 
-TIMER_CALLBACK_MEMBER(to9_state::to8_kbd_timer_cb)
-{
-	to8_kbd_timer_func();
-}
-
-
-
 /* cpu <-> keyboard hand-check */
 void to9_state::to8_kbd_set_ack( int data )
 {
@@ -2877,8 +2868,8 @@ void to9_state::to8_kbd_reset()
 
 void to9_state::to8_kbd_init()
 {
-	m_to8_kbd_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(to9_state::to8_kbd_timer_cb),this));
-	m_to8_kbd_signal = machine().scheduler().timer_alloc(timer_expired_delegate());
+	m_to8_kbd_timer = timer_alloc(TIMER_TO8_KBD);
+	m_to8_kbd_signal = timer_alloc(TIMER_NULL);
 	save_item(NAME(m_to8_kbd_ack));
 	save_item(NAME(m_to8_kbd_data));
 	save_item(NAME(m_to8_kbd_step));
@@ -3978,7 +3969,7 @@ WRITE_LINE_MEMBER( mo6_state::mo6_game_cb2_out )
 
 
 
-TIMER_CALLBACK_MEMBER(mo6_state::mo6_game_update_cb)
+void mo6_state::mo6_game_update_timer_func()
 {
 	/* unlike the TO8, CB1 & CB2 are not connected to buttons */
 	if ( m_io_config->read() & 1 )
@@ -4001,7 +3992,7 @@ TIMER_CALLBACK_MEMBER(mo6_state::mo6_game_update_cb)
 void mo6_state::mo6_game_init()
 {
 	LOG (( "mo6_game_init called\n" ));
-	m_to7_game_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(mo6_state::mo6_game_update_cb),this));
+	m_to7_game_timer = timer_alloc(TIMER_MO6_GAME_UPDATE);
 	m_to7_game_timer->adjust(TO7_GAME_POLL_PERIOD, 0, TO7_GAME_POLL_PERIOD);
 	save_item(NAME(m_to7_game_sound));
 	save_item(NAME(m_to7_game_mute));
@@ -4303,7 +4294,7 @@ MACHINE_START_MEMBER( mo6_state, mo6 )
 	to9_palette_init();
 	to7_modem_init();
 	to7_midi_init();
-	m_mo5_periodic_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(mo6_state::mo5_periodic_cb),this));
+	m_mo5_periodic_timer = timer_alloc(TIMER_MO5_PERIODIC);
 
 	m_extension->rom_map(m_maincpu->space(AS_PROGRAM), 0xa000, 0xa7bf);
 	m_extension->io_map (m_maincpu->space(AS_PROGRAM), 0xa7d0, 0xa7df);
@@ -4423,7 +4414,7 @@ void mo5nr_state::mo5nr_sys_porta_out(uint8_t data)
 void mo5nr_state::mo5nr_game_init()
 {
 	LOG (( "mo5nr_game_init called\n" ));
-	m_to7_game_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(mo5nr_state::mo6_game_update_cb),this));
+	m_to7_game_timer = timer_alloc(TIMER_MO6_GAME_UPDATE);
 	m_to7_game_timer->adjust( TO7_GAME_POLL_PERIOD, 0, TO7_GAME_POLL_PERIOD );
 	save_item(NAME(m_to7_game_sound));
 	save_item(NAME(m_to7_game_mute));
@@ -4505,7 +4496,7 @@ MACHINE_START_MEMBER( mo5nr_state, mo5nr )
 	to9_palette_init();
 	to7_modem_init();
 	to7_midi_init();
-	m_mo5_periodic_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(mo5nr_state::mo5_periodic_cb),this));
+	m_mo5_periodic_timer = timer_alloc(TIMER_MO5_PERIODIC);
 
 	m_extension->rom_map(m_extension_view[0], 0xa000, 0xa7bf);
 	m_extension->io_map (m_extension_view[0], 0xa7d0, 0xa7df);
@@ -4557,4 +4548,62 @@ MACHINE_START_MEMBER( mo5nr_state, mo5nr )
 	save_pointer(NAME(cartmem), 0x10000 );
 	machine().save().register_postload(save_prepost_delegate(FUNC(mo5nr_state::mo6_update_ram_bank_postload), this));
 	machine().save().register_postload(save_prepost_delegate(FUNC(mo5nr_state::mo6_update_cart_bank_postload), this));
+}
+
+/* timers */
+void thomson_state::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+{
+	switch (id)
+	{
+	case TIMER_TO7_GAME_UPDATE:
+		to7_game_update_timer_func();
+		break;
+	case TIMER_MO5_PERIODIC:
+		mo5_periodic_timer_func();
+		break;
+	case TIMER_THOM_LIGHTPEN_STEP:
+		thom_lightpen_step_timer_func(param);
+		break;
+	case TIMER_THOM_SCANLINE_START:
+		thom_scanline_start_timer_func(param);
+		break;
+	case TIMER_THOM_SET_INIT:
+		thom_set_init_timer_func(param);
+		break;
+	case TIMER_NULL:
+		break;
+	default:
+		throw emu_fatalerror("Unknown id in thomson_state::machine_timer");
+	}
+}
+
+void mo6_state::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+{
+	switch (id)
+	{
+	case TIMER_MO6_GAME_UPDATE:
+		mo6_game_update_timer_func();
+		break;
+	case TIMER_NULL:
+		break;
+	default:
+		thomson_state::device_timer(timer, id, param, ptr);
+	}
+}
+
+void to9_state::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+{
+	switch (id)
+	{
+	case TIMER_TO9_KBD:
+		to9_kbd_timer_func();
+		break;
+	case TIMER_TO8_KBD:
+		to8_kbd_timer_func();
+		break;
+	case TIMER_NULL:
+		break;
+	default:
+		thomson_state::device_timer(timer, id, param, ptr);
+	}
 }

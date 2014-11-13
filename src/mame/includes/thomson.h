@@ -99,6 +99,16 @@ struct thom_vsignal {
 class thomson_state : public driver_device
 {
 public:
+	enum
+	{
+		TIMER_TO7_GAME_UPDATE,
+		TIMER_MO5_PERIODIC,
+		TIMER_THOM_LIGHTPEN_STEP,
+		TIMER_THOM_SCANLINE_START,
+		TIMER_THOM_SET_INIT,
+		TIMER_NULL
+	};
+
 	thomson_state(const machine_config &mconfig, device_type type, const char *tag) :
 		driver_device(mconfig, type, tag),
 		m_maincpu(*this, "maincpu"),
@@ -205,7 +215,7 @@ protected:
 	uint8_t to7_game_portb_in();
 	void to7_game_portb_out(uint8_t data);
 	DECLARE_WRITE_LINE_MEMBER( to7_game_cb2_out );
-	TIMER_CALLBACK_MEMBER( to7_game_update_cb );
+	void to7_game_update_timer_func ();
 	uint8_t to7_midi_r();
 	void to7_midi_w(uint8_t data);
 	DECLARE_MACHINE_RESET( to7 );
@@ -222,12 +232,12 @@ protected:
 	DECLARE_MACHINE_START( to770 );
 	void to7_lightpen_cb( int step );
 
-	TIMER_CALLBACK_MEMBER( thom_lightpen_step );
-	TIMER_CALLBACK_MEMBER( thom_scanline_start );
+	void thom_lightpen_step_timer_func (int param);
+	void thom_scanline_start_timer_func (int param);
 	uint32_t screen_update_thom(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
 	void to7_vram_w(offs_t offset, uint8_t data);
 	void to770_vram_w(offs_t offset, uint8_t data);
-	TIMER_CALLBACK_MEMBER( thom_set_init );
+	void thom_set_init_timer_func (int param);
 
 	DECLARE_WRITE_LINE_MEMBER(thom_vblank);
 
@@ -235,10 +245,6 @@ protected:
 	void to7_5p14_w(offs_t offset, uint8_t data);
 	uint8_t to7_5p14sd_r(offs_t offset);
 	void to7_5p14sd_w(offs_t offset, uint8_t data);
-	TIMER_CALLBACK_MEMBER( ans4 );
-	TIMER_CALLBACK_MEMBER( ans3 );
-	TIMER_CALLBACK_MEMBER( ans2 );
-	TIMER_CALLBACK_MEMBER( ans );
 	void thom_palette(palette_device &palette);
 
 	int m_centronics_busy;
@@ -282,6 +288,7 @@ protected:
 	required_region_ptr<uint8_t> m_cart_rom;
 
 	output_finder<> m_caps_led;
+	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 
 	/* bank logging and optimisations */
 	int m_old_cart_bank;
@@ -369,7 +376,7 @@ protected:
 	void to7_midi_init();
 	void to770_update_ram_bank();
 
-	TIMER_CALLBACK_MEMBER( mo5_periodic_cb );
+	void mo5_periodic_timer_func ();
 	int mo5_get_cassette();
 	void mo5_set_cassette( int data );
 	void mo5_init_timer();
@@ -430,6 +437,13 @@ protected:
 class to9_state : public thomson_state
 {
 public:
+	enum
+	{
+		TIMER_TO9_KBD,
+		TIMER_TO8_KBD,
+		TIMER_NULL
+	};
+
 	to9_state(const machine_config &mconfig, device_type type, const char *tag) :
 		thomson_state(mconfig, type, tag),
 		m_syslobank(*this, TO8_SYS_LO),
@@ -471,7 +485,6 @@ protected:
 	uint8_t  m_to8_soft_bank;
 	uint8_t  m_to8_bios_bank;
 
-	TIMER_CALLBACK_MEMBER( to8_kbd_timer_cb );
 	void to8_update_ram_bank_postload();
 	void to8_update_cart_bank_postload();
 	void to8_cartridge_w(offs_t offset, uint8_t data);
@@ -518,7 +531,7 @@ protected:
 	void to9_update_ram_bank_postload();
 	uint8_t to9_kbd_r(offs_t offset);
 	void to9_kbd_w(offs_t offset, uint8_t data);
-	TIMER_CALLBACK_MEMBER( to9_kbd_timer_cb );
+	void to9_kbd_timer_func ();
 	uint8_t to9_sys_porta_in();
 	void to9_sys_porta_out(uint8_t data);
 	void to9_sys_portb_out(uint8_t data);
@@ -551,6 +564,7 @@ protected:
 	uint8_t  m_to9_kbd_caps;  /* caps-lock */
 	uint8_t  m_to9_kbd_pad;   /* keypad outputs special codes */
 	emu_timer* m_to9_kbd_timer;
+	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 
 	void to9_set_video_mode( uint8_t data, int style );
 	void to9_palette_init();
@@ -567,6 +581,12 @@ protected:
 class mo6_state : public to9_state
 {
 public:
+	enum
+	{
+		TIMER_MO6_GAME_UPDATE,
+		TIMER_NULL
+	};
+
 	mo6_state(const machine_config &mconfig, device_type type, const char *tag) :
 		to9_state(mconfig, type, tag),
 		m_cartlobank(*this, MO6_CART_LO),
@@ -584,6 +604,8 @@ protected:
 	optional_memory_bank m_cartlobank;
 	optional_memory_bank m_carthibank;
 
+	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+
 	void mo6_update_ram_bank_postload();
 	void mo6_update_cart_bank_postload();
 	void mo6_cartridge_w(offs_t offset, uint8_t data);
@@ -592,7 +614,7 @@ protected:
 	DECLARE_WRITE_LINE_MEMBER( mo6_centronics_busy );
 	void mo6_game_porta_out(uint8_t data);
 	DECLARE_WRITE_LINE_MEMBER( mo6_game_cb2_out );
-	TIMER_CALLBACK_MEMBER( mo6_game_update_cb );
+	void mo6_game_update_timer_func ();
 	uint8_t mo6_sys_porta_in();
 	uint8_t mo6_sys_portb_in();
 	void mo6_sys_porta_out(uint8_t data);
