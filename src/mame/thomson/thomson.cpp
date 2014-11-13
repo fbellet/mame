@@ -607,9 +607,9 @@ void thomson_state::t9000(machine_config &config)
 }
 
 
-COMP( 1982, to7, 0, 0, to7, to7, thomson_state, empty_init, "Thomson", "TO7", 0 )
+COMP( 1982, to7, 0, 0, to7, to7, thomson_state, empty_init, "Thomson", "TO7", MACHINE_SUPPORTS_SAVE )
 
-COMP( 1980, t9000, to7, 0, t9000, t9000, thomson_state, empty_init, "Thomson", "T9000", 0 )
+COMP( 1980, t9000, to7, 0, t9000, t9000, thomson_state, empty_init, "Thomson", "T9000", MACHINE_SUPPORTS_SAVE )
 
 
 /***************************** TO7/70 *********************************
@@ -799,9 +799,9 @@ void thomson_state::to770a(machine_config &config)
 	SOFTWARE_LIST(config, "t770a_cart_list").set_original("to770a_cart");
 }
 
-COMP( 1984, to770, 0, 0, to770, to770, thomson_state, empty_init, "Thomson", "TO7/70", 0 )
+COMP( 1984, to770, 0, 0, to770, to770, thomson_state, empty_init, "Thomson", "TO7/70", MACHINE_SUPPORTS_SAVE )
 
-COMP( 1984, to770a, to770, 0, to770a, to770a, thomson_state, empty_init, "Thomson", "TO7/70 (Arabic)", 0 )
+COMP( 1984, to770a, to770, 0, to770a, to770a, thomson_state, empty_init, "Thomson", "TO7/70 (Arabic)", MACHINE_SUPPORTS_SAVE )
 
 
 /************************* MO5 / MO5E *********************************
@@ -996,9 +996,9 @@ void mo5_state::mo5e(machine_config &config)
 }
 
 
-COMP( 1984, mo5, 0, 0, mo5, mo5, mo5_state, empty_init, "Thomson", "MO5", 0 )
+COMP( 1984, mo5, 0, 0, mo5, mo5, mo5_state, empty_init, "Thomson", "MO5", MACHINE_SUPPORTS_SAVE )
 
-COMP( 1986, mo5e, mo5, 0, mo5e, mo5e, mo5_state, empty_init, "Thomson", "MO5E", 0 )
+COMP( 1986, mo5e, mo5, 0, mo5e, mo5e, mo5_state, empty_init, "Thomson", "MO5E", MACHINE_SUPPORTS_SAVE )
 
 
 /********************************* TO9 *******************************
@@ -1192,7 +1192,7 @@ void to9_state::to9(machine_config &config)
 }
 
 
-COMP( 1985, to9, 0, 0, to9, to9, to9_state, empty_init, "Thomson", "TO9", MACHINE_IMPERFECT_COLORS )
+COMP( 1985, to9, 0, 0, to9, to9, to9_state, empty_init, "Thomson", "TO9", MACHINE_IMPERFECT_COLORS | MACHINE_SUPPORTS_SAVE )
 
 
 /******************************** TO8 ********************************
@@ -1384,9 +1384,9 @@ void to9_state::to8d(machine_config &config)
 }
 
 
-COMP( 1986, to8, 0, 0, to8, to8, to9_state, empty_init, "Thomson", "TO8", 0 )
+COMP( 1986, to8, 0, 0, to8, to8, to9_state, empty_init, "Thomson", "TO8", MACHINE_SUPPORTS_SAVE )
 
-COMP( 1987, to8d, to8, 0, to8d, to8d, to9_state, empty_init, "Thomson", "TO8D", 0 )
+COMP( 1987, to8d, to8, 0, to8d, to8d, to9_state, empty_init, "Thomson", "TO8D", MACHINE_SUPPORTS_SAVE )
 
 
 /******************************** TO9+ *******************************
@@ -1529,7 +1529,7 @@ void to9_state::to9p(machine_config &config)
 	SOFTWARE_LIST(config.replace(), "to7_qd_list").set_compatible("to7_qd");
 }
 
-COMP( 1986, to9p, 0, 0, to9p, to9p, to9_state, empty_init, "Thomson", "TO9+", 0 )
+COMP( 1986, to9p, 0, 0, to9p, to9p, to9_state, empty_init, "Thomson", "TO9+", MACHINE_SUPPORTS_SAVE )
 
 
 
@@ -1855,9 +1855,9 @@ void mo6_state::pro128(machine_config &config)
 	SOFTWARE_LIST(config, "p128_flop_list").set_original("pro128_flop");
 }
 
-COMP( 1986, mo6, 0, 0, mo6, mo6, mo6_state, empty_init, "Thomson", "MO6", 0 )
+COMP( 1986, mo6, 0, 0, mo6, mo6, mo6_state, empty_init, "Thomson", "MO6", MACHINE_SUPPORTS_SAVE )
 
-COMP( 1986, pro128, mo6, 0, pro128, pro128, mo6_state, empty_init, "Olivetti / Thomson", "Prodest PC 128", 0 )
+COMP( 1986, pro128, mo6, 0, pro128, pro128, mo6_state, empty_init, "Olivetti / Thomson", "Prodest PC 128", MACHINE_SUPPORTS_SAVE )
 
 
 
@@ -2111,4 +2111,4 @@ void mo5nr_state::mo5nr(machine_config &config)
 	SOFTWARE_LIST(config, "mo5_qd_list").set_compatible("mo5_qd");
 }
 
-COMP( 1986, mo5nr, 0, 0, mo5nr, mo5nr, mo5nr_state, empty_init, "Thomson", "MO5 NR", 0 )
+COMP( 1986, mo5nr, 0, 0, mo5nr, mo5nr, mo5nr_state, empty_init, "Thomson", "MO5 NR", MACHINE_SUPPORTS_SAVE )
