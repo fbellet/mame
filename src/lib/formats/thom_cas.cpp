@@ -37,7 +37,7 @@
 #define VLOG(x) do { if (VERBOSE > 1) printf x; } while (0)
 
 
-#define TO7_BIT_LENGTH 0.001114
+#define TO7_BIT_LENGTH ( 7/6300. )
 
 #define TO7_FREQ_CASS_0 4500.
 #define TO7_FREQ_CASS_1 6300.
@@ -85,19 +85,12 @@ static uint8_t* to7_k7_bits;
 
 
 
-static const cassette_image::Modulation to7_k7_modulation =
-{
-	cassette_image::MODULATION_SQUAREWAVE,
-	4000.0,  4500.0, 5000.0,
-	5500.0,  6300.0, 7500.0
-};
-
-
-
 static cassette_image::error to7_k7_identify ( cassette_image *cass, cassette_image::Options *opts )
 {
-	cassette_image::error e = cass->modulation_identify( to7_k7_modulation, opts );
-	return e;
+	opts -> bits_per_sample = 8;
+	opts -> channels = 1;
+	opts -> sample_frequency = 31500;
+	return cassette_image::error::SUCCESS;
 }
 
 
