@@ -53,7 +53,7 @@
    1 when the signal is around 6.3 kHz.
 */
 
-#define TO7_BIT_LENGTH 0.001114
+#define TO7_BIT_LENGTH ( 7/6300. )
 
 /* 1-bit cassette input to the computer
    inside the controller, two frequency filters (adjusted to 6.3 and 4.5 kHz)
@@ -86,10 +86,10 @@ int thomson_state::to7_get_cassette()
 			/* demodulate wave signal on-the-fly */
 			/* we simply count sign changes... */
 			int k, chg;
-			int8_t data[40];
-			cass->get_samples( 0, pos, TO7_BIT_LENGTH * 15. / 14., 40, 1, data, 0 );
+			int8_t data[38];
+			cass->get_samples( 0, pos, TO7_BIT_LENGTH * 38. / 35., 38, 1, data, 0 );
 
-			for ( k = 1, chg = 0; k < 40; k++ )
+			for ( k = 1, chg = 0; k < 38; k++ )
 			{
 				if ( data[ k - 1 ] >= 0 && data[ k ] < 0 )
 					chg++;
