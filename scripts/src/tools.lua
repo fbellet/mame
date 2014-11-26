@@ -726,6 +726,48 @@ configuration { }
 strip()
 
 --------------------------------------------------
+-- wav2k7
+--------------------------------------------------
+
+project("wav2k7")
+uuid ("761186a7-77e7-4cce-be50-a363a9c95059")
+kind "ConsoleApp"
+
+flags {
+	"Symbols", -- always include minimum symbols for executables
+}
+
+if _OPTIONS["SEPARATE_BIN"]~="1" then
+	targetdir(MAME_DIR)
+end
+
+links {
+	"formats",
+	"utils",
+	ext_lib("expat"),
+	"ocore_" .. _OPTIONS["osd"],
+	ext_lib("zlib"),
+	ext_lib("flac"),
+}
+
+includedirs {
+	MAME_DIR .. "src/osd",
+	MAME_DIR .. "src/lib",
+	MAME_DIR .. "src/lib/util",
+}
+
+files {
+	MAME_DIR .. "src/tools/wav2k7/wav2k7.cpp",
+}
+
+configuration { "mingw*" or "vs*" }
+	targetextension ".exe"
+
+configuration { }
+
+strip()
+
+--------------------------------------------------
 -- aueffectutil
 --------------------------------------------------
 
