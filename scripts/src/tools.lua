@@ -719,6 +719,46 @@ configuration { }
 strip()
 
 --------------------------------------------------
+-- wav2k7
+--------------------------------------------------
+
+project("wav2k7")
+uuid ("761186a7-77e7-4cce-be50-a363a9c95059")
+kind "ConsoleApp"
+
+options {
+	"ForceCPP",
+}
+
+configuration { }
+	targetdir(MAME_DIR)
+
+links {
+	"formats",
+	"utils",
+	"expat",
+	"zlib",
+	"ocore_" .. _OPTIONS["osd"],
+}
+
+includedirs {
+	MAME_DIR .. "src/osd",
+	MAME_DIR .. "src/lib",
+	MAME_DIR .. "src/lib/util",
+}
+
+files {
+	MAME_DIR .. "src/tools/wav2k7/wav2k7.c",
+}
+
+configuration { "mingw*" or "vs*" }
+	targetextension ".exe"
+
+configuration { }
+
+strip()
+
+--------------------------------------------------
 -- aueffectutil
 --------------------------------------------------
 
