@@ -26,7 +26,7 @@
    files are more compact anyway. */
 /* It must be set accordingly in machine/thomson.c */
 
-#define VERBOSE 0 /* 0, 1 or 2 */
+#define VERBOSE 2 /* 0, 1 or 2 */
 
 
 /***************************** utilities **************************/
@@ -45,8 +45,9 @@
 #define TO7_PERIOD_CASS_0 ( 1. / TO7_FREQ_CASS_0 )
 #define TO7_PERIOD_CASS_1 ( 1. / TO7_FREQ_CASS_1 )
 
-static uint32_t to7_k7_bitsize;
-static uint8_t* to7_k7_bits;
+uint32_t to7_k7_bitsize;
+uint8_t* to7_k7_bits;
+static int bitmax=1024;
 
 #define MO5_BIT_LENGTH   0.000833
 #define MO5_HBIT_LENGTH (MO5_BIT_LENGTH / 2.)
@@ -94,15 +95,89 @@ static cassette_image::error to7_k7_identify ( cassette_image *cass, cassette_im
 }
 
 
+/* store one period */
+#if K7_SPEED_HACK
+static inline void K7_PUT( cassette_image *cass, double *time, double PERIOD )
+{
+}
+#else
+static inline void K7_PUT( cassette_image *cass, double *time, double PERIOD )
+{
+	static const int8_t square_wave[] = { -128, 127 };
+
+	cass->put_samples( 0, *time, (PERIOD), 2, 1,
+				square_wave, cassette_image::WAVEFORM_8BIT );
+	*time += (PERIOD);
+}
+#endif
+
+static inline void K7_PUT_BIT( cassette_image *cass, double *time, int BIT )
+{
+	int b;
+	if ( BIT )
+	{
+		for ( b = 0; b < 7; b++ )
+			K7_PUT( cass, time, TO7_PERIOD_CASS_1 );
+	}
+	else
+	{
+		for ( b = 0; b < 5; b++ )
+			K7_PUT( cass, time, TO7_PERIOD_CASS_0 );
+	}
+	if ( to7_k7_bitsize + 1 >= bitmax )
+	{
+		uint8_t* a = (uint8_t*)malloc(bitmax * 2);
+		memcpy ( a, to7_k7_bits, bitmax );
+		bitmax *= 2;
+		free (to7_k7_bits);
+		to7_k7_bits = a;
+	}
+	to7_k7_bits[ to7_k7_bitsize++ ] = (BIT);
+}
+
+/* store one byte, with start / stop bits */
+static inline void K7_PUT_BYTE( cassette_image *cass, double *time, int BYTE )
+{
+	uint8_t x;
+	K7_PUT_BIT( cass, time, 0 );
+	for ( x = 0; x < 8; x++ )
+		K7_PUT_BIT( cass, time, ( (BYTE) >> x ) & 1 );
+	K7_PUT_BIT( cass, time, 1 );
+	K7_PUT_BIT( cass, time, 1 );
+}
+
+static inline void K7_FILL_1( cassette_image *cass, double *time, int SIZE )
+{
+	if ( (SIZE) > 0 ) {
+		int ii;
+		LOG (( "to7_k7_load: 1-filler size=%i bitstart=%i\n",
+			(SIZE), to7_k7_bitsize ));
+		for ( ii = 0; ii < (SIZE); ii++ )
+			K7_PUT_BIT( cass, time, 1 );
+	}
+}
+
+static inline void K7_FILL_ff( cassette_image *cass, double *time, int SIZE )
+{
+	if ( (SIZE) > 0 )
+	{
+		int ii;
+		LOG (( "to7_k7_load: 0xff filler size=%i bitstart=%i\n",
+			(SIZE), to7_k7_bitsize ));
+		for ( ii = 0; ii < (SIZE); ii++ )
+			K7_PUT_BYTE( cass, time, 0xff );
+	}
+}
+
+	/* check format */
 
 static cassette_image::error to7_k7_load( cassette_image *cass )
 {
 #if ! K7_SPEED_HACK
-	static const int8_t square_wave[] = { -128, 127 };
 	double time = 0.;
 #endif
 	size_t size = cass->image_size( ), pos = 0;
-	int i, sz, sz2, bitmax = 1024, invalid = 0;
+	int i, sz, sz2, invalid = 0;
 	uint8_t typ, block[264];
 
 	LOG (( "to7_k7_load: start conversion, size=%li\n", (long)size ));
@@ -117,84 +192,6 @@ static cassette_image::error to7_k7_load( cassette_image *cass )
 	to7_k7_bitsize = 0;
 	to7_k7_bits = (uint8_t*)malloc(bitmax );
 
-/* store one period */
-#if K7_SPEED_HACK
-#define K7_PUT( PERIOD )
-#else
-#define K7_PUT( PERIOD ) \
-	do                              \
-	{                               \
-		cassette_image::error err;                      \
-		err = cass->put_samples( 0, time, (PERIOD), 2, 1, \
-						square_wave, cassette_image::WAVEFORM_8BIT ); \
-		if ( err != cassette_image::error::SUCCESS )                      \
-			return err;                 \
-		time += (PERIOD);                   \
-	} while (0)
-#endif
-
-/* store one bit */
-#define K7_PUT_BIT( BIT ) \
-	do                              \
-	{                               \
-		int b;                          \
-		if ( BIT )                      \
-		{                           \
-			for ( b = 0; b < 7; b++ )           \
-				K7_PUT( TO7_PERIOD_CASS_1 );        \
-		}                           \
-		else                            \
-		{                           \
-			for ( b = 0; b < 5; b++ )           \
-				K7_PUT( TO7_PERIOD_CASS_0 );        \
-		}                           \
-		if ( to7_k7_bitsize + 1 >= bitmax )         \
-		{                           \
-			uint8_t* a = (uint8_t*)malloc(bitmax * 2);      \
-			memcpy ( a, to7_k7_bits, bitmax );      \
-			bitmax *= 2;                    \
-			free (to7_k7_bits);		\
-			to7_k7_bits = a;                \
-		}                           \
-		to7_k7_bits[ to7_k7_bitsize++ ] = (BIT);        \
-	} while (0)
-
-/* store one byte, with start / stop bits */
-#define K7_PUT_BYTE( BYTE ) \
-	do                          \
-	{                           \
-		uint8_t x;                    \
-		K7_PUT_BIT( 0 );                \
-		for ( x = 0; x < 8; x++ )           \
-			K7_PUT_BIT( ( (BYTE) >> x ) & 1 );  \
-		K7_PUT_BIT( 1 );                \
-		K7_PUT_BIT( 1 );                \
-	} while (0)
-
-#define K7_FILL_1( SIZE ) \
-	do                              \
-	{                               \
-		if ( (SIZE) > 0 ) {                 \
-			int ii;                     \
-			LOG (( "to7_k7_load: 1-filler size=%i bitstart=%i\n", \
-					(SIZE), to7_k7_bitsize ));      \
-			for ( ii = 0; ii < (SIZE); ii++ ) K7_PUT_BIT( 1 ); \
-		}                           \
-	} while (0)
-
-#define K7_FILL_ff( SIZE ) \
-	do                              \
-	{                               \
-		if ( (SIZE) > 0 )                   \
-		{                           \
-			int ii;                     \
-			LOG (( "to7_k7_load: 0xff filler size=%i bitstart=%i\n",  (SIZE), to7_k7_bitsize )); \
-			for ( ii = 0; ii < (SIZE); ii++ )       \
-				K7_PUT_BYTE( 0xff );            \
-		}                           \
-	} while (0)
-
-	/* check format */
 	cass->image_read( block, 0, 64 );
 	for ( i = 3; ; i++ )
 	{
@@ -265,8 +262,8 @@ static cassette_image::error to7_k7_load( cassette_image *cass )
 
 		/* 1-filler and 0xff-filler */
 		if ( typ == 0 || typ == 0xff )
-			K7_FILL_1( 1000 );
-		K7_FILL_ff( sz );
+			K7_FILL_1( cass, &time, 1000 );
+		K7_FILL_ff( cass, &time, sz );
 
 		/* put block */
 		LOG (( "to7_k7_load: block off=$%x type=$%02X size=%i bitstart=%i\n", (int) pos-sz2-4, typ, sz2, to7_k7_bitsize ));
@@ -274,7 +271,7 @@ static cassette_image::error to7_k7_load( cassette_image *cass )
 		for ( i = 0; i < sz2 + 4; i ++)
 		{
 			VLOG (( " $%02X", block[i] ));
-			K7_PUT_BYTE( block[i] );
+			K7_PUT_BYTE( cass, &time, block[i] );
 		}
 		VLOG (( "\n" ));
 
@@ -301,7 +298,7 @@ static cassette_image::error to7_k7_load( cassette_image *cass )
 
 		/* extra 1-fillers */
 		if ( typ == 0 || typ == 0xff )
-			K7_FILL_1( 1000 );
+			K7_FILL_1( cass, &time, 1000 );
 	}
 
 	/* trailing data with invalid block structure
@@ -335,13 +332,13 @@ static cassette_image::error to7_k7_load( cassette_image *cass )
 				if ( ( ( in1 == 0x3d ) && ( in2 == 0 ) ) || ( ( in1 == 0x57 ) && ( in2 == 0x49 ) ) )
 				{
 					/* special block (Infogrames) => just prepend filler */
-					K7_FILL_1 ( 500 );
+					K7_FILL_1 ( cass, &time, 500 );
 					LOG (( "to7_k7_load: special $%02X $%02X $%02X block found off=$%x bitstart=%i\n", in, in1, in2, (int) pos, to7_k7_bitsize ));
 				}
 			}
 			for ( i = 0; i < sz; i++ )
-				K7_PUT_BYTE( 0xff );
-			K7_PUT_BYTE( in );
+				K7_PUT_BYTE( cass, &time, 0xff );
+			K7_PUT_BYTE( cass, &time, in );
 		}
 	}
 
