@@ -89,7 +89,7 @@ static cassette_image::error to7_k7_identify ( cassette_image *cass, cassette_im
 {
 	opts -> bits_per_sample = 8;
 	opts -> channels = 1;
-	opts -> sample_frequency = 31500;
+	opts -> sample_frequency = 44100;
 	return cassette_image::error::SUCCESS;
 }
 
