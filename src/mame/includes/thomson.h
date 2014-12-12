@@ -556,9 +556,13 @@ protected:
 	uint8_t  m_to9_kbd_status;  /* status */
 	uint8_t  m_to9_kbd_overrun; /* character lost */
 	uint8_t  m_to9_kbd_periph;     /* peripheral mode */
+	uint8_t  m_to9_kbd_periph_signal;
 	uint8_t  m_to9_kbd_byte_count; /* byte-count in peripheral mode */
 	uint16_t m_to9_mouse_x;
 	uint16_t m_to9_mouse_y;
+	int16_t  m_to9_mouse_x_delta;
+	int16_t  m_to9_mouse_y_delta;
+	uint16_t m_to9_mouse_b;
 	uint8_t  m_to9_kbd_last_key;  /* for key repetition */
 	uint16_t m_to9_kbd_key_count;
 	uint8_t  m_to9_kbd_caps;  /* caps-lock */
