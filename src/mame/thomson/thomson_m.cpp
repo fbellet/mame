@@ -29,6 +29,8 @@
 /* It must be set accordingly in formats/thom_cas.c */
 #define K7_SPEED_HACK 0
 
+extern uint32_t to7_k7_bitsize;
+extern uint8_t* to7_k7_bits;
 
 /*-------------- TO7 ------------*/
 
@@ -71,6 +73,9 @@ int thomson_state::to7_get_cassette()
 		if ( (state & CASSETTE_MASK_MOTOR) == CASSETTE_MOTOR_DISABLED )
 			return 1;
 
+		m_to7_k7_bits = to7_k7_bits;
+		m_to7_k7_bitsize = to7_k7_bitsize;
+
 		if ( K7_SPEED_HACK && m_to7_k7_bits )
 		{
 			/* hack, feed existing bits */
@@ -85,22 +90,64 @@ int thomson_state::to7_get_cassette()
 		{
 			/* demodulate wave signal on-the-fly */
 			/* we simply count sign changes... */
-			int k, chg;
+			int k, l, chg;
 			int8_t data[52];
+			char data_str[53];
 			cass->get_samples( 0, pos, TO7_BIT_LENGTH * 52. / 49., 52, 1, data, 0 );
 
+#if 1
+			data_str[0] = (data[0]<0?'_':'-');
 			for ( k = 1, chg = 0; k < 52; k++ )
 			{
+				data_str[k] = (data[k]<0?'_':'-');
 				if ( data[ k - 1 ] >= 0 && data[ k ] < 0 )
 					chg++;
 				if ( data[ k - 1 ] <= 0 && data[ k ] > 0 )
 					chg++;
 			}
+			data_str[52] = '\0';
 			k = ( chg >= 13 ) ? 1 : 0;
-			LOGMASKED(LOG_EXTRA, "$%04x %f to7_get_cassette: state=$%X pos=%f samppos=%i bit=%i (%i)\n",
-				m_maincpu->pc(), machine().time().as_double(), state, pos, bitpos,
-				k, chg);
+#endif
+#if 0
+			int x=0;
+			int nb63k=0;
+			int nb45k=0;
+			double delta, pos0, pos1;
+			for ( k = 0, chg = 0; k < 51; k++ )
+			{
+				data_str[k] = (data[k]<0?'_':'-');
+				if ( data[k]<0 && data[k+1]>0 ) {
+					if (x==0) {
+						x=1;
+						pos0=pos+k/44100.;
+					} else {
+						pos1=pos+k/44100.;
+						delta=(pos1-pos0);
+						if (delta > 0.80/6300. && delta < 1.20/6300.) nb63k++;
+						if (delta > 0.80/4500. && delta < 1.20/4500.) nb45k++;
+						pos0=pos1;
+					}
+				}
+			}
+			data_str[51] = (data[51]<0?'_':'-');
+			data_str[52] = '\0';
+			k=(nb63k>=nb45k) ? 1 : 0;
+#endif
+
+			l = 49.*(pos-bitpos*TO7_BIT_LENGTH)/TO7_BIT_LENGTH;
+#if 1
+			LOGMASKED(LOG_EXTRA, "$%04x to7_get_cassette: state=$%X pos=%f samppos=%i+%02i bit=%i (%i) %s\n",
+				m_maincpu->pc(), state, pos, bitpos,
+				l, k, chg, data_str);
+
 			return k;
+#endif
+#if 0
+			LOGMASKED(LOG_EXTRA, "$%04x to7_get_cassette: pos=%f samppos=%i+%02i bit=%i %s\n",
+				m_maincpu->pc(), pos, bitpos,
+				l, m_to7_k7_bits[bitpos], data_str);
+			return m_to7_k7_bits[ bitpos ];
+#endif
 		}
 
 	}
@@ -113,7 +160,14 @@ int thomson_state::to7_get_cassette()
 /* 1-bit cassette output */
 void thomson_state::to7_set_cassette(int state)
 {
+	static double prev_time=0., cur_time=0.;
+	double pos = m_cassette->get_position();
+	double delta;
 	m_cassette->output(state ? 1. : -1. );
+	cur_time=machine().time().as_double();
+	delta=cur_time-prev_time;
+	LOGMASKED(LOG_EXTRA, "$%04x to7_set_cassette: pos=%f data=%d delta=%f\n", m_maincpu->pc(), pos, state, delta);
+	prev_time=cur_time;
 }
 
 
