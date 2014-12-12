@@ -47,7 +47,7 @@ debug_view_disasm_source::debug_view_disasm_source(std::string &&name, device_t 
 debug_view_disasm::debug_view_disasm(running_machine &machine, debug_view_osd_update_func osdupdate, void *osdprivate)
 	: debug_view(machine, DVT_DISASSEMBLY, osdupdate, osdprivate),
 		m_right_column(DASM_RIGHTCOL_RAW),
-		m_backwards_steps(3),
+		m_backwards_steps(6),
 		m_dasm_width(DEFAULT_DASM_WIDTH),
 		m_previous_pc(1),
 		m_expression(machine)
