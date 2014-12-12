@@ -153,6 +153,7 @@ static cassette_image::error to7_k7_load( cassette_image *cass )
 			uint8_t* a = (uint8_t*)malloc(bitmax * 2);      \
 			memcpy ( a, to7_k7_bits, bitmax );      \
 			bitmax *= 2;                    \
+			free (to7_k7_bits);		\
 			to7_k7_bits = a;                \
 		}                           \
 		to7_k7_bits[ to7_k7_bitsize++ ] = (BIT);        \
