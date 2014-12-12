@@ -130,7 +130,7 @@ private:
 
 	// constants
 	static constexpr int DEFAULT_DASM_LINES = 1000;
-	static constexpr int DEFAULT_DASM_WIDTH = 50;
+	static constexpr int DEFAULT_DASM_WIDTH = 30;
 	static constexpr int DASM_MAX_BYTES = 16;
 };
 

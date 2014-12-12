@@ -42,7 +42,7 @@ debug_view_disasm_source::debug_view_disasm_source(std::string &&name, device_t 
 debug_view_disasm::debug_view_disasm(running_machine &machine, debug_view_osd_update_func osdupdate, void *osdprivate)
 	: debug_view(machine, DVT_DISASSEMBLY, osdupdate, osdprivate),
 		m_right_column(DASM_RIGHTCOL_RAW),
-		m_backwards_steps(3),
+		m_backwards_steps(6),
 		m_dasm_width(DEFAULT_DASM_WIDTH),
 		m_previous_pc(1),
 		m_expression(machine)
@@ -427,7 +427,7 @@ void debug_view_disasm::redraw()
 	int m_divider2 = m_divider1 + 1 + m_dasm_width + 1;
 
 	// set the width of the third column to max comment length
-	m_total.x = m_divider2 + 1 + 50;        // DEBUG_COMMENT_MAX_LINE_LENGTH
+	m_total.x = m_divider2 + 1 + 75;        // DEBUG_COMMENT_MAX_LINE_LENGTH
 
 	// loop over visible rows
 	for(u32 row = 0; row < m_visible.y; row++)
