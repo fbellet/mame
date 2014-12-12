@@ -86,10 +86,10 @@ int thomson_state::to7_get_cassette()
 			/* demodulate wave signal on-the-fly */
 			/* we simply count sign changes... */
 			int k, chg;
-			int8_t data[38];
-			cass->get_samples( 0, pos, TO7_BIT_LENGTH * 38. / 35., 38, 1, data, 0 );
+			int8_t data[52];
+			cass->get_samples( 0, pos, TO7_BIT_LENGTH * 52. / 49., 52, 1, data, 0 );
 
-			for ( k = 1, chg = 0; k < 38; k++ )
+			for ( k = 1, chg = 0; k < 52; k++ )
 			{
 				if ( data[ k - 1 ] >= 0 && data[ k ] < 0 )
 					chg++;

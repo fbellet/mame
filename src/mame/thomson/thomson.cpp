@@ -502,7 +502,7 @@ static const struct cassette_image::Options to7_cassette_options =
 {
 	1,      /* channels */
 	8,      /* bits per sample */
-	31500   /* sample frequency */
+	44100   /* sample frequency */
 };
 
 void thomson_state::to7_base(machine_config &config, bool is_mo)
