@@ -87,9 +87,13 @@ private:
 	uint8_t  m_kbd_status = 0;  /* status */
 	uint8_t  m_kbd_overrun = 0; /* character lost */
 	uint8_t  m_kbd_periph = 0;     /* peripheral mode */
+	uint8_t  m_kbd_periph_signal = 0;
 	uint8_t  m_kbd_byte_count = 0; /* byte-count in peripheral mode */
 	uint16_t m_mouse_x = 0;
 	uint16_t m_mouse_y = 0;
+	int16_t m_mouse_x_delta = 0;
+	int16_t m_mouse_y_delta = 0;
+	uint16_t m_mouse_b = 0;
 	uint8_t  m_kbd_last_key = 0;  /* for key repetition */
 	uint16_t m_kbd_key_count = 0;
 	uint8_t  m_kbd_caps = 0;  /* caps-lock */

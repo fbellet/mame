@@ -575,9 +575,14 @@ void to8_keyboard_device::device_start()
 /* normal mode: polling interval */
 #define TO9_KBD_POLL_PERIOD  attotime::from_msec( 10 )
 
-/* peripheral mode: time between two bytes, and after last byte */
-#define TO9_KBD_BYTE_SPACE   attotime::from_usec( 300 )
-#define TO9_KBD_END_SPACE    attotime::from_usec( 9100 )
+/* peripheral mode: time between two bytes, and after last byte
+ * 1 bytes consists in 1 start bit, 8 data bits, 1 parity bit, and 3
+ * stop bits, transmitted at 9600 bauds.
+ * 4 bytes are transmitted every 10 ms
+ */
+
+#define TO9_KBD_BYTE_SPACE   attotime::from_usec( 1354 )
+#define TO9_KBD_END_SPACE    attotime::from_usec( 10000 - 3*1354 )
 
 /* first and subsequent repeat periods, in TO9_KBD_POLL_PERIOD units */
 #define TO9_KBD_REPEAT_DELAY  80 /* 800 ms */
@@ -692,9 +697,9 @@ void to9_keyboard_device::kbd_acia_w(offs_t offset, uint8_t data)
 		{
 			/* bits 2-4: parity */
 			if ( (data & 0x18) == 0x10 )
-				m_kbd_parity = 2;
+				m_kbd_parity = 2; /* 2=no parity */
 			else
-				m_kbd_parity = (data >> 2) & 1;
+				m_kbd_parity = (data >> 2) & 1;  /* 0=even, 1=odd */
 			/* bits 5-6: interrupt on transmit */
 			/* bit 7:    interrupt on receive */
 			m_kbd_intr = data >> 5;
@@ -720,6 +725,7 @@ void to9_keyboard_device::kbd_acia_w(offs_t offset, uint8_t data)
 			/* reset */
 			m_kbd_caps = 1;
 			m_kbd_periph = 0;
+			m_kbd_periph_signal = 0;
 			m_kbd_pad = 0;
 			break;
 
@@ -727,7 +733,10 @@ void to9_keyboard_device::kbd_acia_w(offs_t offset, uint8_t data)
 		case 0xFA: m_kbd_caps = 0;   break;
 		case 0xFB: m_kbd_pad = 1;    break;
 		case 0xFC: m_kbd_pad = 0;    break;
-		case 0xFD: m_kbd_periph = 1; break;
+		case 0xFD:
+			   m_kbd_periph = 1;
+			   m_kbd_periph_signal = 1;
+			   break;
 		case 0xFE: m_kbd_periph = 0; break;
 
 		default:
@@ -907,46 +916,86 @@ TIMER_CALLBACK_MEMBER(to9_keyboard_device::timer_cb)
 {
 	if ( m_kbd_periph )
 	{
-		/* peripheral mode: every 10 ms we send 4 bytes */
+		/* peripheral mode: every 10 ms we send 4 bytes if
+		 * at least one of these conditions are met:
+		 *  - a key has been pressed
+		 *  - the mouse has moved
+		 *  - the mouse buttons status have changed
+		 * the condition is evaluated at the beginning of the
+		 * period, as it decides how many data are sent during
+		 * the rest of the period.
+		 *
+		 * Ref: docto9.djvu, p17, "F. Gestion Clavier "ACIA 6850 et uC 6805":
+		 * "la scrutation du clavier par le uC 6805 a lieu uniquement lorsque une
+		 * touche est appuyee"
+		 */
 
 		switch ( m_kbd_byte_count )
 		{
 		case 0: /* key */
-			send( get_key(), 0 );
-			break;
+		{
+			int key = get_key();
+			int newx = m_io_mouse_x->read();
+			int newy = m_io_mouse_y->read();
+			int newb = m_io_mouse_button->read();
 
+			/* this is an ugly hack, based on code reverse engineering, but it
+			 * seems that the mouse tells its presence by sending a key value > $b0
+			 * ($335c - $337a, in the irq kbd handler, bits
+			 * b1-b0 are stored in $607d).
+			 * b1=0,b0=1 : mouse_x and mouse_y are relative values
+			 * b1=1      : mouse_x and mouse_y are absolute values (tablet ?)
+			 * So we mimick that behaviour (choosing the relative move case).
+			 */
+
+			if ( !key && m_kbd_periph_signal ) {
+				key = 0xb1;
+				m_kbd_periph_signal = 0;
+			}
+
+			if ( key || newx != m_mouse_x || newy != m_mouse_y || newb != m_mouse_b ) {
+				send( key, 0 );
+				m_kbd_byte_count++;
+				m_kbd_timer->adjust(TO9_KBD_BYTE_SPACE);
+			} else
+				m_kbd_timer->adjust(TO9_KBD_POLL_PERIOD);
+
+			m_mouse_x_delta = newx - m_mouse_x;
+			m_mouse_y_delta = newy - m_mouse_y;
+			if ( m_mouse_x_delta > 127 || m_mouse_y_delta < -128)
+				m_mouse_x_delta = 0;
+			if ( m_mouse_y_delta > 127 || m_mouse_y_delta < -128)
+				m_mouse_y_delta = 0;
+			m_mouse_x = newx;
+			m_mouse_y = newy;
+			m_mouse_b = newb;
+			break;
+		}
 		case 1: /* x axis */
 		{
-			int newx = m_io_mouse_x.read_safe(0);
-			uint8_t data = ( (newx - m_mouse_x) & 0xf ) - 8;
-			send( data, 1 );
-			m_mouse_x = newx;
+			send( m_mouse_x_delta , 1 );
+			m_kbd_byte_count++;
+			m_kbd_timer->adjust(TO9_KBD_BYTE_SPACE);
 			break;
 		}
-
 		case 2: /* y axis */
 		{
-			int newy = m_io_mouse_y.read_safe(0);
-			uint8_t data = ( (newy - m_mouse_y) & 0xf ) - 8;
-			send( data, 1 );
-			m_mouse_y = newy;
+			send( m_mouse_y_delta, 1 );
+			m_kbd_byte_count++;
+			m_kbd_timer->adjust(TO9_KBD_BYTE_SPACE);
 			break;
 		}
-
 		case 3: /* axis overflow & buttons */
 		{
-			int b = m_io_mouse_button.read_safe(~0);
 			uint8_t data = 0;
-			if ( b & 1 ) data |= 1;
-			if ( b & 2 ) data |= 4;
+			if ( (m_mouse_b & 1) == 0 ) data |= 1;
+			if ( (m_mouse_b & 2) == 0 ) data |= 4;
 			send( data, 1 );
+			m_kbd_byte_count = 0;
+			m_kbd_timer->adjust(TO9_KBD_END_SPACE);
 			break;
 		}
-
 		}
-
-		m_kbd_byte_count = ( m_kbd_byte_count + 1 ) & 3;
-		m_kbd_timer->adjust(m_kbd_byte_count ? TO9_KBD_BYTE_SPACE : TO9_KBD_END_SPACE);
 	}
 	else
 	{
@@ -967,6 +1016,7 @@ void to9_keyboard_device::device_reset()
 	m_kbd_intr = 0;     /* interrupt disabled */
 	m_kbd_caps = 1;
 	m_kbd_periph = 0;
+	m_kbd_periph_signal = 0;
 	m_kbd_pad = 0;
 	m_kbd_byte_count = 0;
 	m_caps_led = !m_kbd_caps;
@@ -992,8 +1042,12 @@ void to9_keyboard_device::device_start()
 	save_item(NAME(m_kbd_key_count));
 	save_item(NAME(m_kbd_caps));
 	save_item(NAME(m_kbd_periph));
+	save_item(NAME(m_kbd_periph_signal));
 	save_item(NAME(m_kbd_pad));
 	save_item(NAME(m_kbd_byte_count));
 	save_item(NAME(m_mouse_x));
 	save_item(NAME(m_mouse_y));
+	save_item(NAME(m_mouse_x_delta));
+	save_item(NAME(m_mouse_y_delta));
+	save_item(NAME(m_mouse_b));
 }
