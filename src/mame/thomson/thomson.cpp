@@ -498,6 +498,13 @@ static void to35_floppy_formats(format_registration &fr)
 
 /* ------------ driver ------------ */
 
+static const struct cassette_image::Options to7_cassette_options =
+{
+	1,      /* channels */
+	8,      /* bits per sample */
+	31500   /* sample frequency */
+};
+
 void thomson_state::to7_base(machine_config &config, bool is_mo)
 {
 	MCFG_MACHINE_START_OVERRIDE( thomson_state, to7 )
@@ -543,6 +550,7 @@ void thomson_state::to7_base(machine_config &config, bool is_mo)
 	m_cassette->set_formats(to7_cassette_formats);
 	m_cassette->set_default_state(CASSETTE_PLAY | CASSETTE_MOTOR_DISABLED | CASSETTE_SPEAKER_ENABLED);
 	m_cassette->set_interface("to_cass");
+	m_cassette->set_create_opts(&to7_cassette_options);
 
 /* extension port */
 	THOMSON_EXTENSION(config, m_extension, 16_MHz_XTAL / 16);
@@ -953,6 +961,13 @@ INPUT_PORTS_END
 
 /* ------------ driver ------------ */
 
+static const struct cassette_image::Options mo5_cassette_options =
+{
+	1,      /* channels */
+	8,      /* bits per sample */
+	22100   /* sample frequency */
+};
+
 void mo5_state::mo5(machine_config &config)
 {
 	to7_base(config, true);
@@ -963,6 +978,7 @@ void mo5_state::mo5(machine_config &config)
 
 	m_cassette->set_formats(mo5_cassette_formats);
 	m_cassette->set_interface("mo_cass");
+	m_cassette->set_create_opts(&mo5_cassette_options);
 
 	subdevice<palette_device>("palette")->set_init(FUNC(mo5_state::mo5_palette));
 
