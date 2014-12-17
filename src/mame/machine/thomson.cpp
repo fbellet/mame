@@ -2381,7 +2381,7 @@ void to9_state::to9_kbd_timer_func()
 			 * b1-b0 are stored in $607d).
 			 * b1=0,b0=1 : mouse_x and mouse_y are relative values
 			 * b1=1      : mouse_x and mouse_y are absolute values (tablet ?)
-			 * So we mimick that behaviour (choosing b1=1).
+			 * So we mimick that behaviour (choosing the relative move case).
 			 */
 
 			if ( !key && m_to9_kbd_periph_signal ) {
