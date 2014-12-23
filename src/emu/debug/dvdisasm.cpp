@@ -427,7 +427,7 @@ void debug_view_disasm::redraw()
 	int m_divider2 = m_divider1 + 1 + m_dasm_width + 1;
 
 	// set the width of the third column to max comment length
-	m_total.x = m_divider2 + 1 + 75;        // DEBUG_COMMENT_MAX_LINE_LENGTH
+	m_total.x = m_divider2 + 1 + 100;        // DEBUG_COMMENT_MAX_LINE_LENGTH
 
 	// loop over visible rows
 	for(u32 row = 0; row < m_visible.y; row++)
