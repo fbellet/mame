@@ -402,7 +402,7 @@ public:
 
 	// device_debug helpers
 	// [TODO] [RH]: Look into this more later, can possibly merge these two classes
-	void start_hook(device_t *device, bool stop_on_vblank);
+	void start_hook(device_t *device, bool stop_on_vblank, bool stepping_any);
 	void stop_hook(device_t *device);
 	void go_next_device(device_t *device);
 	void go_vblank();
