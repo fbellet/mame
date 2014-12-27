@@ -287,7 +287,7 @@ void debugger_cpu::reset_transient_flags()
 //  EXECUTION HOOKS
 //**************************************************************************
 
-void debugger_cpu::start_hook(device_t *device, bool stop_on_vblank)
+void debugger_cpu::start_hook(device_t *device, bool stop_on_vblank, bool stepping_any)
 {
 	// stash a pointer to the current live CPU
 	assert(m_livecpu == nullptr);
@@ -314,7 +314,10 @@ void debugger_cpu::start_hook(device_t *device, bool stop_on_vblank)
 		device_t *visiblecpu = m_machine.debugger().console().get_visible_cpu();
 		if (device == visiblecpu && osd_ticks() > m_last_periodic_update_time + osd_ticks_per_second() / 4)
 		{   // check for periodic updates
-			m_machine.debug_view().update_all();
+			if (stepping_any)
+				m_machine.debug_view().update_all_except(DVT_DISASSEMBLY);
+			else
+				m_machine.debug_view().update_all();
 			m_machine.debug_view().flush_osd_updates();
 			m_last_periodic_update_time = osd_ticks();
 		}
@@ -610,7 +613,7 @@ void device_debug::start_hook(const attotime &endtime)
 {
 	assert((m_device.machine().debug_flags & DEBUG_FLAG_ENABLED) != 0);
 
-	m_device.machine().debugger().cpu().start_hook(&m_device, (m_flags & DEBUG_FLAG_STOP_VBLANK) != 0);
+	m_device.machine().debugger().cpu().start_hook(&m_device, (m_flags & DEBUG_FLAG_STOP_VBLANK) != 0, (m_flags & DEBUG_FLAG_STEPPING_ANY) != 0);
 
 	// update the target execution end time
 	m_endexectime = endtime;
