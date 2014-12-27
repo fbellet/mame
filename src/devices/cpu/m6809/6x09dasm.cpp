@@ -178,8 +178,10 @@ offs_t m6x09_base_disassembler::disassemble(std::ostream &stream, offs_t pc, con
 			util::stream_format(stream, "%sY",  (pb&0x1f)?",":"");
 		if (pb & 0x40)
 			util::stream_format(stream, "%s%s", (pb&0x3f)?",":"", (op->mode() == PULS)?"U":"S");
-		if (pb & 0x80)
+		if (pb & 0x80) {
 			util::stream_format(stream, "%sPC", (pb&0x7f)?",":"");
+			return (p-pc) | op->flags() | STEP_OUT | SUPPORTED;
+		}
 		break;
 
 	case DIR:
@@ -346,9 +348,9 @@ const m6x09_base_disassembler::opcodeinfo m6x09_disassembler::m6x09_opcodes[] =
 	{ 0x35, 2, "PULS",  PULS,   M6x09_GENERAL },
 	{ 0x36, 2, "PSHU",  PSHU,   M6x09_GENERAL },
 	{ 0x37, 2, "PULU",  PULU,   M6x09_GENERAL },
-	{ 0x39, 1, "RTS",   INH ,   M6x09_GENERAL },
+	{ 0x39, 1, "RTS",   INH ,   M6x09_GENERAL, STEP_OUT },
 	{ 0x3A, 1, "ABX",   INH,    M6x09_GENERAL },
-	{ 0x3B, 1, "RTI",   INH,    M6x09_GENERAL },
+	{ 0x3B, 1, "RTI",   INH,    M6x09_GENERAL, STEP_OUT },
 	{ 0x3C, 2, "CWAI",  IMM,    M6x09_GENERAL },
 	{ 0x3D, 1, "MUL",   INH,    M6x09_GENERAL },
 	{ 0x3F, 1, "SWI",   INH,    M6x09_GENERAL },
