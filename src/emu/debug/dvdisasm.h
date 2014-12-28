@@ -129,7 +129,7 @@ private:
 	std::vector<dasm_line> m_dasm;                 // disassembled instructions
 
 	// constants
-	static constexpr int DEFAULT_DASM_LINES = 1000;
+	static constexpr int DEFAULT_DASM_LINES = 500;
 	static constexpr int DEFAULT_DASM_WIDTH = 30;
 	static constexpr int DASM_MAX_BYTES = 16;
 };
