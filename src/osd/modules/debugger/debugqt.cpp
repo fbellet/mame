@@ -151,6 +151,11 @@ void debug_qt::wait_for_debugger(device_t &device, bool firststop)
 			m_config.reset();
 		}
 		m_mainwindow->show();
+		foreach (QWidget* widget, QApplication::topLevelWidgets()) {
+			if (!widget->isWindow() || widget->windowType() != Qt::Window)
+				continue;
+			widget->setWindowIcon (QIcon::fromTheme ("mame"));
+		}
 	}
 
 	// Ensure all top level widgets are visible & bring main window to front
