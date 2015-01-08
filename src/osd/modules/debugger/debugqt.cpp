@@ -297,6 +297,11 @@ void debug_qt::wait_for_debugger(device_t &device, bool firststop)
 		load_and_clear_main_window_config(xmlConfigurations);
 		setup_additional_startup_windows(*m_machine, xmlConfigurations);
 		mainQtWindow->show();
+		foreach (QWidget* widget, QApplication::topLevelWidgets()) {
+			if (!widget->isWindow() || widget->windowType() != Qt::Window)
+				continue;
+			widget->setWindowIcon (QIcon::fromTheme ("mame"));
+		}
 		oneShot = false;
 	}
 
