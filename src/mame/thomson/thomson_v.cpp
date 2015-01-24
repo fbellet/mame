@@ -146,21 +146,32 @@ struct thom_vsignal thomson_state::thom_get_lightpen_vsignal( int xdec, int ydec
 	if ( gpl < 0 )
 		gpl += 19968;
 
-	v.inil = (gpl & 63) <= 41;
+	v.inil = (gpl & 63) < 40;
 
 	v.init = (gpl <= 64 * THOM_ACTIVE_HEIGHT - 24);
 
+	/*
+	 * LT3 is in fact TL3 (fourth bit of the line counter, always
+	 * incremented at the difference of T3)
+	 */
 	v.lt3 = ( gpl & 8 ) ? 1 : 0;
 
-	v.line = y;
+	v.line = gpl >> 6;
 
-	if ( v.inil && v.init )
-		v.count =
-			( gpl >> 6 ) * 320 +  /* line */
-			( gpl & 63 ) *   8 +  /* gpl inside line */
-			( (x + xdec2) & 7 );  /* pixel inside gpl */
-	else
-		v.count = 0;
+	/*
+	 * The count value is generated as follows:
+	 *   T12-T3 (frame counter, 10 bits)
+	 *   TL2-TL0 (line counter, 3 bits)
+	 *   E (clock 1MHz, 1 bit)
+	 *   H2 (clock 2MHz, 1 bit)
+	 *   H4 (clock 4MHz, 1 bit)
+	 * The frame counter is incremented (from TL2 carry) only when INIL=1
+	 */
+	v.count =
+		( gpl >> 6 ) * 320 +			/* line T12-T6 */
+		( v.inil ? gpl & 0x38 : 40 ) *   8 +	/* gpl inside line T5-T3 */
+		( gpl & 0x7 ) * 8 +			/* gpl inside line TL2-TL0 */
+		( (x + xdec2) & 7 );			/* pixel inside gpl E,H2,H4 */
 
 	return v;
 }
