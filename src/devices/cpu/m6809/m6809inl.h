@@ -243,14 +243,7 @@ inline T m6809_base_device::set_flags(uint8_t mask, T r)
 
 inline void m6809_base_device::eat_remaining()
 {
-	// we do this in order to be nice to people debugging
-	uint16_t real_pc = m_pc.w;
-
 	eat(m_icount);
-
-	m_pc.w = m_ppc.w;
-	debugger_instruction_hook(m_pc.w);
-	m_pc.w = real_pc;
 }
 
 
