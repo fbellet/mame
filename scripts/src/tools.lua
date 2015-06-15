@@ -737,9 +737,18 @@ links {
 	"formats",
 	"utils",
 	"expat",
-	"zlib",
 	"ocore_" .. _OPTIONS["osd"],
 }
+
+if _OPTIONS["with-bundled-zlib"] then
+        links {
+                "zlib",
+        }
+else
+        links {
+                "z",
+        }
+end
 
 includedirs {
 	MAME_DIR .. "src/osd",
