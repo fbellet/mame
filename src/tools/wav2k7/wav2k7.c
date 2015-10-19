@@ -114,7 +114,7 @@ static int mo5_next_byte (cassette_image::ptr &cassette, double *pos, uint8_t *b
 	cassette_image::Info info = cassette->get_info( );
 	double len = info.sample_count / info.sample_frequency;
 	uint8_t b = 0;
-	uint8_t bit;
+	uint8_t bit = 0;
 	int i;
 	int found = 0;
 
@@ -136,7 +136,7 @@ static int do_convert_mo5 (cassette_image::ptr &cassette, FILE *f)
 	cassette_image::Info info = cassette->get_info( );
 	double len = info.sample_count / info.sample_frequency;
 	uint8_t data[ 260 ];
-	uint8_t b;
+	uint8_t b = 0;
 	uint8_t crc;
 	int size;
 	double pos = 0;
