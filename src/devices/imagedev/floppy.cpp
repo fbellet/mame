@@ -1457,11 +1457,11 @@ void floppy_sound_device::device_start()
 	// Read audio samples. The samples are stored in the list m_samples.
 	m_loaded = load_samples();
 
-	// If we don't have all samples, don't allocate a stream or access sample data.
-	if (m_loaded)
-	{
-		m_sound = stream_alloc(0, 1, clock()); // per-floppy stream
-	}
+	// The stream is allocated _even_ if we don't have all samples
+	// because we want to avoid having mixers created with no
+	// inputs: it breaks the save/load state logic of the
+	// device_mixer_interface (m_mixer_stream is not allocated)
+	m_sound = stream_alloc(0, 1, clock()); // per-floppy stream
 	register_for_save_states();
 }
 
