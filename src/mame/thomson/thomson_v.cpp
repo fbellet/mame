@@ -9,6 +9,7 @@
 **********************************************************************/
 
 #include "emu.h"
+#include "crsshair.h"
 #include "thomson.h"
 
 #include <algorithm>
@@ -1086,7 +1087,9 @@ void thomson_state::thom_vblank(int state)
 
 		/* schedule first lightpen signal */
 		l.line &= ~1; /* hack (avoid lock in MO6 palette selection) */
-		m_thom_lightpen_timer->adjust(
+		if (machine().crosshair().get_crosshair
+			(ioport("lightpen_x")->fields().first()->player()).is_visible())
+			m_thom_lightpen_timer->adjust(
 					attotime::from_usec( 64 * ( THOM_BORDER_HEIGHT + l.line - 2 ) + 16 ), 0);
 
 		/* schedule first active-area scanline call-back */
