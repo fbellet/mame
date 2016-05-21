@@ -29,6 +29,7 @@ public:
 	virtual void exit() override { }
 
 	virtual void init_debugger(running_machine &machine) override;
+	virtual void stop_debugger() override;
 	virtual void wait_for_debugger(device_t &device, bool firststop) override;
 	virtual void debugger_update() override;
 
@@ -39,6 +40,10 @@ private:
 void debug_none::init_debugger(running_machine &machine)
 {
 	m_machine = &machine;
+}
+
+void debug_none::stop_debugger()
+{
 }
 
 void debug_none::wait_for_debugger(device_t &device, bool firststop)

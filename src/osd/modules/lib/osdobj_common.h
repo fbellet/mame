@@ -197,6 +197,7 @@ public:
 
 	// debugger overridables
 	virtual void init_debugger() override;
+	virtual void stop_debugger() override;
 	virtual void wait_for_debugger(device_t &device, bool firststop) override;
 
 	// audio overridables

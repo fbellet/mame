@@ -122,6 +122,7 @@ public:
 	virtual void exit() override {};
 
 	virtual void init_debugger(running_machine &machine) override;
+	virtual void stop_debugger() override;
 	virtual void wait_for_debugger(device_t &device, bool firststop) override;
 	virtual void debugger_update() override;
 
@@ -1458,6 +1459,10 @@ void debug_imgui::init_debugger(running_machine &machine)
 	else
 		io.Fonts->AddFontFromFileTTF(font_name,font_size);  // for now, font name must be a path to a TTF file
 	imguiCreate();
+}
+
+void debug_imgui::stop_debugger()
+{
 }
 
 void debug_imgui::wait_for_debugger(device_t &device, bool firststop)

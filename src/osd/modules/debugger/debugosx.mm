@@ -65,6 +65,7 @@ public:
 	virtual void exit();
 
 	virtual void init_debugger(running_machine &machine);
+	virtual void stop_debugger();
 	virtual void wait_for_debugger(device_t &device, bool firststop);
 	virtual void debugger_update();
 
@@ -133,6 +134,14 @@ void debugger_osx::init_debugger(running_machine &machine)
 			config_save_delegate(&debugger_osx::config_save, this));
 }
 
+
+//============================================================
+//  debugger_osx::stop_debugger
+//============================================================
+
+void debugger_osx::stop_debugger()
+{
+}
 
 //============================================================
 //  debugger_osx::wait_for_debugger

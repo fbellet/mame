@@ -452,6 +452,7 @@ public:
 	virtual void exit() override;
 
 	virtual void init_debugger(running_machine &machine) override;
+	virtual void stop_debugger() override;
 	virtual void wait_for_debugger(device_t &device, bool firststop) override;
 	virtual void debugger_update() override;
 
@@ -631,6 +632,11 @@ void debug_gdbstub::generate_target_xml()
 	target_xml += "  </feature>\n";
 	target_xml += "</target>\n";
 	m_target_xml = escape_packet(target_xml);
+}
+
+//-------------------------------------------------------------------------
+void debug_gdbstub::stop_debugger()
+{
 }
 
 //-------------------------------------------------------------------------

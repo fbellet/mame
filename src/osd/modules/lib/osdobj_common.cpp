@@ -505,6 +505,10 @@ void osd_common_t::init_debugger()
 	m_debugger->init_debugger(machine());
 }
 
+void osd_common_t::stop_debugger()
+{
+	if (m_debugger) m_debugger->stop_debugger();
+}
 
 //-------------------------------------------------
 //  wait_for_debugger - wait for a debugger
@@ -526,7 +530,6 @@ void osd_common_t::debugger_update()
 {
 	if (m_debugger) m_debugger->debugger_update();
 }
-
 
 //-------------------------------------------------
 //  update_audio_stream - update the stereo audio

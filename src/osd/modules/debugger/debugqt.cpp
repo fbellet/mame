@@ -48,6 +48,7 @@ public:
 	virtual void exit() { }
 
 	virtual void init_debugger(running_machine &machine);
+	virtual void stop_debugger();
 	virtual void wait_for_debugger(device_t &device, bool firststop);
 	virtual void debugger_update();
 #if defined(WIN32) && !defined(SDLMAME_WIN32)
@@ -69,6 +70,7 @@ char qtArg0[] = "mame";
 char *qtArgv[] = { qtArg0, nullptr };
 
 bool oneShot = true;
+bool isRunning = false;
 MainWindow *mainQtWindow = nullptr;
 
 //============================================================
@@ -257,22 +259,34 @@ void debug_qt::init_debugger(running_machine &machine)
 	else
 	{
 		// If you've done a hard reset, clear out existing widgets & get ready for re-init
-		foreach (QWidget *widget, QApplication::topLevelWidgets())
-		{
-			if (!widget->isWindow() || widget->windowType() != Qt::Window)
-				continue;
-			delete widget;
+		bool needRestart = true;
+
+		while (needRestart) {
+			needRestart = false;
+			foreach (QWidget *widget, QApplication::topLevelWidgets())
+			{
+				if (!widget->isWindow() || widget->windowType() != Qt::Window)
+					continue;
+				delete widget;
+				needRestart = true;
+				break;
+			}
 		}
 		oneShot = true;
 	}
 
 	m_machine = &machine;
+	isRunning = true;
 	// Setup the configuration XML saving and loading
 	machine.configuration().config_register("debugger",
 			config_load_delegate(&xml_configuration_load, &machine),
 			config_save_delegate(&xml_configuration_save, &machine));
 }
 
+void debug_qt::stop_debugger()
+{
+	isRunning = false;
+}
 
 //============================================================
 //  Core functionality
@@ -364,7 +378,7 @@ void debug_qt::wait_for_debugger(device_t &device, bool firststop)
 
 void debug_qt::debugger_update()
 {
-	qApp->processEvents(QEventLoop::AllEvents, 1);
+	if (isRunning) qApp->processEvents(QEventLoop::AllEvents, 1);
 }
 
 #else // USE_QTDEBUG

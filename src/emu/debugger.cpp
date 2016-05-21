@@ -83,6 +83,8 @@ debugger_manager::debugger_manager(running_machine &machine)
 
 debugger_manager::~debugger_manager()
 {
+	/* suspend osd debugger features while hard resetting */
+	g_machine->osd().stop_debugger();
 	g_machine = nullptr;
 }
 
