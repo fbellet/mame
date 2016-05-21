@@ -665,8 +665,6 @@ void sdl_osd_interface::process_events()
 void sdl_osd_interface::osd_exit()
 {
 	osd_common_t::osd_exit();
-
-	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
 
 
