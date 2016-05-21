@@ -256,8 +256,6 @@ sdl_osd_interface::~sdl_osd_interface()
 void sdl_osd_interface::osd_exit()
 {
 	osd_common_t::osd_exit();
-
-	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
 
 //============================================================
