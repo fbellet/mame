@@ -801,8 +801,7 @@ void device_debug::instruction_hook(offs_t curpc)
 	// are we tracking our recent pc visits?
 	if (m_track_pc)
 	{
-		const u32 crc = compute_opcode_crc32(curpc);
-		m_track_pc_set.insert(dasm_pc_tag(curpc, crc));
+		m_track_pc_set.insert(dasm_pc_tag(curpc, 0));
 	}
 
 	// are we tracing?
@@ -1581,8 +1580,7 @@ bool device_debug::track_pc_visited(offs_t pc) const
 {
 	if (m_track_pc_set.empty())
 		return false;
-	const u32 crc = compute_opcode_crc32(pc);
-	return m_track_pc_set.find(dasm_pc_tag(pc, crc)) != m_track_pc_set.end();
+	return m_track_pc_set.find(dasm_pc_tag(pc, 0)) != m_track_pc_set.end();
 }
 
 
@@ -1592,8 +1590,7 @@ bool device_debug::track_pc_visited(offs_t pc) const
 
 void device_debug::set_track_pc_visited(offs_t pc)
 {
-	const u32 crc = compute_opcode_crc32(pc);
-	m_track_pc_set.insert(dasm_pc_tag(pc, crc));
+	m_track_pc_set.insert(dasm_pc_tag(pc, 0));
 }
 
 
