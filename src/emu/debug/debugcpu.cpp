@@ -1998,16 +1998,22 @@ void device_debug::tracer::update(offs_t pc)
 	{
 		// check for a loop condition
 		int count = 0;
-		for (auto & elem : m_history)
-			if (elem == pc)
-				count++;
-
-		// if more than 1 hit, just up the loop count and get out
-		if (count > 1)
+		int i = m_nextdex;
+		do
 		{
-			m_loops++;
-			return;
+			if (m_history[i] == pc)
+			{
+				count++;
+				// if more than 1 hit, just up the loop count and get out
+				if (count > 1)
+				{
+					m_loops++;
+					return;
+				}
+			}
+			i = (i + TRACE_LOOPS -1 ) % TRACE_LOOPS;
 		}
+		while (i != m_nextdex);
 
 		// if we just finished looping, indicate as much
 		if (m_loops != 0)
