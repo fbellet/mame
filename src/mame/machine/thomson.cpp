@@ -2608,7 +2608,8 @@ MACHINE_START_MEMBER( to9_state, to9 )
 	m_thom_vram = ram;
 	m_thom_cart_bank = 0;
 	m_vrambank->configure_entries( 0,  2, m_thom_vram, 0x2000 );
-	m_cartbank->configure_entries( 0, 12, cartmem, 0x4000 );
+	m_cartbank->configure_entries( 0, 4, cartmem, 0x4000 );
+	m_cartbank->configure_entries( 4, 8, mem + 0x10000, 0x4000 );
 	m_basebank->configure_entry( 0,  ram + 0x4000);
 	m_rambank->configure_entries( 0, 10, ram + 0x8000, 0x4000 );
 	m_vrambank->set_entry( 0 );
