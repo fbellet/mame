@@ -464,7 +464,6 @@ void MainWindow::debugActClose()
 void MainWindow::debuggerExit()
 {
 	m_exiting = true;
-	close();
 }
 
 

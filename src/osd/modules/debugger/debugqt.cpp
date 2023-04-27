@@ -107,6 +107,8 @@ void debug_qt::exit()
 {
 	// If you've done a hard reset, clear out existing widgets
 	emit exitDebugger();
+	QApplication::closeAllWindows();
+	qApp->processEvents(QEventLoop::AllEvents, 1);
 	m_mainwindow = nullptr;
 }
 

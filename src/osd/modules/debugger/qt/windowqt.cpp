@@ -251,7 +251,6 @@ void WindowQt::debugActQuit()
 
 void WindowQt::debuggerExit()
 {
-	close();
 }
 
 
