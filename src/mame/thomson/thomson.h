@@ -17,9 +17,11 @@
 
 #include "cpu/m6809/m6809.h"
 #include "imagedev/cassette.h"
+#include "imagedev/floppy.h"
 #include "machine/6821pia.h"
 #include "machine/input_merger.h"
 #include "machine/mc6846.h"
+#include "machine/wd_fdc.h"
 #include "machine/ram.h"
 #include "sound/dac.h"
 #include "bus/thomson/extension.h"
@@ -388,6 +390,8 @@ public:
 		thomson_state(mconfig, type, tag),
 		m_to8_kbd(*this, "to8_kbd"),
 		m_to9_kbd(*this, "to9_kbd"),
+		m_wd2793(*this, "wd2793"),
+		m_floppy(*this, "wd2793:%u", 0U),
 		m_centronics(*this, "centronics"),
 		m_cent_data_out(*this, "cent_data_out"),
 		m_syslobank(*this, TO8_SYS_LO),
@@ -406,6 +410,8 @@ public:
 protected:
 	optional_device<to8_keyboard_device> m_to8_kbd;
 	optional_device<to9_keyboard_device> m_to9_kbd;
+	optional_device<wd2793_device> m_wd2793;
+	optional_device_array<floppy_connector, 3> m_floppy;
 	optional_device<centronics_device> m_centronics;
 	optional_device<output_latch_device> m_cent_data_out;
 
@@ -489,6 +495,10 @@ protected:
 	void to9_palette_init();
 	void to9_update_cart_bank();
 	void to9_update_ram_bank();
+
+	void wd2793_control_w(u8 data);
+	u8 wd2793_control_r();
+	u8 m_wd2793_control;
 };
 
 class mo6_state : public to9_state
