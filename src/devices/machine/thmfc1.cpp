@@ -241,7 +241,7 @@ u8 thmfc1_device::stat1_r()
 			res |= S1_MTON;
 		if(!m_cur_floppy->trk00_r())
 			res |= S1_TRK0;
-		if(!m_cur_floppy->wpt_r())
+		if(m_cur_floppy->wpt_r())
 			res |= S1_WPRT;
 		if(!m_cur_floppy->ready_r())
 			res |= S1_RDY;
