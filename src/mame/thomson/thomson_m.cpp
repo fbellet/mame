@@ -1781,33 +1781,46 @@ void to9_state::to9_timer_port_out(uint8_t data)
 	to9_update_cart_bank();
 }
 
+/* ------------ WD2793 (floppy) ------------ */
 
-
-/* ------------ WD disk controller ------------ */
-
-
-
-void to9_state::to9_floppy_control_w(u8 data)
+void to9_state::wd2793_control_w(u8 data)
 {
-	m_to9_floppy_control = data;
-
+	// drive select
+	int drive = -1, side = 0;
 	floppy_image_device *floppy = nullptr;
-	if (BIT(m_to9_floppy_control, 1))
-		floppy = m_floppy[0]->get_device();
-	else if (BIT(m_to9_floppy_control, 2))
-		floppy = m_floppy[1]->get_device();
-	if (floppy)
-		floppy->ss_w(BIT(m_to9_floppy_control, 0));
-	m_fdc->set_floppy(floppy);
 
-	m_fdc->dden_w(BIT(m_to9_floppy_control, 7));
+	drive = BIT(data,2);
+	side = BIT(data, 0);
+	switch (data & 7)
+	{
+	case 0: break;
+	case 2: drive = 0; side = 0; floppy = m_floppy[0]->get_device(); break;
+	/* Internal floppy drive is single sided only */
+	case 3: drive = 0; side = 1; floppy = nullptr; break;
+	case 4: drive = 1; side = 0; floppy = m_floppy[1]->get_device(); break;
+	case 5: drive = 1; side = 1; floppy = m_floppy[1]->get_device(); break;
+	default:
+		LOGMASKED(LOG_ERRORS, "%f $%04x wd2793_control_w: invalid drive select pattern $%02X\n",
+			machine().time().as_double(), m_maincpu->pc(), data);
+	}
+	if(floppy)
+	{
+		floppy->mon_w(0);
+		floppy->ss_w(side);
+	}
+	m_wd2793->set_floppy(floppy);
+	m_wd2793->dden_w(BIT(data, 7));
+	m_wd2793_control = data;
+
+	LOG("%f $%04x wd2793_control_w: $%02X set drive=%i side=%i density=%s\n",
+		machine().time().as_double(), m_maincpu->pc(), data, drive, side,
+		(BIT(data, 7) ? "FM" : "MFM"));
 }
 
-uint8_t to9_state::to9_floppy_control_r()
+u8 to9_state::wd2793_control_r()
 {
-	return m_to9_floppy_control & 0x80;
+	return m_wd2793_control;
 }
-
 
 /* ------------ init / reset ------------ */
 
@@ -1842,6 +1855,12 @@ MACHINE_RESET_MEMBER( to9_state, to9 )
 
 	/* lightpen */
 	m_to7_lightpen = 0;
+
+	/* floppy */
+	m_wd2793_control = 0;
+	m_wd2793->set_floppy(nullptr);
+	m_wd2793->dden_w(0);
+	m_wd2793->reset();
 }
 
 
@@ -1860,10 +1879,6 @@ MACHINE_START_MEMBER( to9_state, to9 )
 
 	m_extension->rom_map(m_maincpu->space(AS_PROGRAM), 0xe000, 0xe7bf);
 	m_extension->io_map (m_maincpu->space(AS_PROGRAM), 0xe7c0, 0xe7ff);
-
-	m_to9_floppy_control = 0;
-	m_fdc->set_floppy(nullptr);
-	m_fdc->dden_w(0);
 
 	/* memory */
 	m_thom_vram = ram;
@@ -1884,10 +1899,10 @@ MACHINE_START_MEMBER( to9_state, to9 )
 	save_item(NAME(m_to7_lightpen));
 	save_item(NAME(m_to7_lightpen_step));
 	save_item(NAME(m_to9_soft_bank));
-	save_item(NAME(m_to9_floppy_control));
 	save_pointer(NAME(cartmem), 0x10000 );
 	machine().save().register_postload(save_prepost_delegate(FUNC(to9_state::to9_update_ram_bank_postload), this));
 	machine().save().register_postload(save_prepost_delegate(FUNC(to9_state::to9_update_cart_bank_postload), this));
+	save_item(NAME(m_wd2793_control));
 }
 
 
