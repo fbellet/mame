@@ -11,6 +11,7 @@
 
 #include "extension.h"
 #include "imagedev/floppy.h"
+#include "machine/thmfc1.h"
 
 class cd90_351_device : public device_t, public thomson_extension_interface
 {
@@ -28,6 +29,7 @@ protected:
 	virtual void device_reset() override ATTR_COLD;
 
 private:
+	required_device<thmfc1_device> m_thmfc1;
 	required_memory_region m_rom;
 	memory_bank_creator m_rom_bank;
 

@@ -215,7 +215,6 @@ u8 thmfc1_device::stat0_r()
 {
 	if(!machine().side_effects_disabled()) {
 		sync();
-#if 0
 		static int ps = -1;
 		if(m_stat0 != ps)
 			logerror("stat0_r %02x -%s%s%s%s%s%s\n", m_stat0,
@@ -226,7 +225,6 @@ u8 thmfc1_device::stat0_r()
 					 m_stat0 & S0_DREQ  ? " dreq" : "",
 					 m_stat0 & S0_SYNC  ? " sync" : "");
 		ps = m_stat0;
-#endif
 	}
 	return m_stat0;
 }
@@ -262,10 +260,8 @@ u8 thmfc1_device::stat1_r()
 
 u8 thmfc1_device::rdata_r()
 {
-	if(!machine().side_effects_disabled()) {
-		logerror("rdata_r %02X (stat0=%02X)\n", m_data, m_stat0);
+	if(!machine().side_effects_disabled())
 		m_stat0 &= ~(S0_BYTE | S0_DREQ);
-	}
 	return m_data;
 }
 

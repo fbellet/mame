@@ -18,6 +18,7 @@ DEFINE_DEVICE_TYPE(CD90_351, cd90_351_device, "cd90_351", "Thomson CD 90-351 Dis
 cd90_351_device::cd90_351_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, CD90_351, tag, owner, clock),
 	thomson_extension_interface(mconfig, *this),
+	m_thmfc1(*this, "thmfc1"),
 	m_rom(*this, "rom"),
 	m_rom_bank(*this, "rom_bank")
 {
@@ -64,9 +65,9 @@ void cd90_351_device::floppy_formats(format_registration &fr)
 
 void cd90_351_device::device_add_mconfig(machine_config &config)
 {
-	THMFC1(config, "thmfc1", 16000000);
+	THMFC1(config, "thmfc1", 16_MHz_XTAL);
 	FLOPPY_CONNECTOR(config, "thmfc1:0", floppy_drives, "dd90_352", floppy_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, "thmfc1:1", floppy_drives, nullptr,    floppy_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, "thmfc1:1", floppy_drives, nullptr, floppy_formats).enable_sound(true);
 }
 
 void cd90_351_device::device_start()
