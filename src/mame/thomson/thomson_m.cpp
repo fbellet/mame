@@ -19,7 +19,7 @@
 #define LOG_EXTRA  (1U << 4)
 #define LOG_ERRORS (1U << 5)
 
-#define VERBOSE (LOG_ERRORS)
+#define VERBOSE (LOG_ERRORS|LOG_GENERAL)
 #include "logmacro.h"
 
 
@@ -2180,6 +2180,46 @@ void to9_state::to9_timer_port_out(uint8_t data)
 	to9_update_cart_bank();
 }
 
+/* ------------ WD2793 (floppy) ------------ */
+
+void to9_state::wd2793_control_w(u8 data)
+{
+	// drive select
+	int drive = -1, side = 0;
+	floppy_image_device *floppy = nullptr;
+
+	drive = BIT(data,2);
+	side = BIT(data, 0);
+	switch (data & 7)
+	{
+	case 0: break;
+	case 2: drive = 0; side = 0; floppy = m_floppy[0]->get_device(); break;
+	/* Internal floppy drive is single sided only */
+	case 3: drive = 0; side = 1; floppy = nullptr; break;
+	case 4: drive = 1; side = 0; floppy = m_floppy[1]->get_device(); break;
+	case 5: drive = 1; side = 1; floppy = m_floppy[2]->get_device(); break;
+	default:
+		LOGMASKED(LOG_ERRORS, "%f $%04x wd2793_control_w: invalid drive select pattern $%02X\n",
+			machine().time().as_double(), m_maincpu->pc(), data);
+	}
+	if(floppy)
+	{
+		floppy->mon_w(0);
+		floppy->ss_w(0);
+	}
+	m_wd2793->set_floppy(floppy);
+	m_wd2793->dden_w(BIT(data, 7));
+	m_wd2793_control = data;
+
+	LOG("%f $%04x wd2793_control_w: $%02X set drive=%i side=%i density=%s\n",
+		machine().time().as_double(), m_maincpu->pc(), data, drive, side,
+		(BIT(data, 7) ? "FM" : "MFM"));
+}
+
+u8 to9_state::wd2793_control_r()
+{
+	return m_wd2793_control;
+}
 
 /* ------------ init / reset ------------ */
 
@@ -2215,6 +2255,12 @@ MACHINE_RESET_MEMBER( to9_state, to9 )
 
 	/* lightpen */
 	m_to7_lightpen = 0;
+
+	/* floppy */
+	m_wd2793_control = 0;
+	m_wd2793->set_floppy(nullptr);
+	m_wd2793->dden_w(0);
+	m_wd2793->reset();
 }
 
 
@@ -2243,10 +2289,12 @@ MACHINE_START_MEMBER( to9_state, to9 )
 	m_cartbank->configure_entries( 4, 8, mem + 0x10000, 0x4000 );
 	m_basebank->configure_entry( 0,  ram + 0x4000);
 	m_rambank->configure_entries( 0, 10, ram + 0x8000, 0x4000 );
+	m_flopbank->configure_entry( 0,  mem + 0xe000);
 	m_vrambank->set_entry( 0 );
 	m_cartbank->set_entry( 0 );
 	m_basebank->set_entry( 0 );
 	m_rambank->set_entry( 0 );
+	m_flopbank->set_entry( 0 );
 
 	/* save-state */
 	save_item(NAME(m_thom_cart_nb_banks));
@@ -2257,6 +2305,7 @@ MACHINE_START_MEMBER( to9_state, to9 )
 	save_pointer(NAME(cartmem), 0x10000 );
 	machine().save().register_postload(save_prepost_delegate(FUNC(to9_state::to9_update_ram_bank_postload), this));
 	machine().save().register_postload(save_prepost_delegate(FUNC(to9_state::to9_update_cart_bank_postload), this));
+	save_item(NAME(m_wd2793_control));
 }
 
 

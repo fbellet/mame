@@ -1051,9 +1051,12 @@ void to9_state::to9_map(address_map &map)
 	map(0x4000, 0x5fff).bankr(THOM_VRAM_BANK).w(FUNC(to9_state::to770_vram_w));
 	map(0x6000, 0x9fff).bankrw(THOM_BASE_BANK); /* 16 KB */
 	map(0xa000, 0xdfff).bankrw(THOM_RAM_BANK);  /* 10 * 16 KB */
+	map(0xe000, 0xe7bf).bankr(THOM_FLOP_BANK);  /* 2 KB */
 	map(0xe7c0, 0xe7c7).rw(m_mc6846, FUNC(mc6846_device::read), FUNC(mc6846_device::write));
 	map(0xe7c8, 0xe7cb).rw("pia_0", FUNC(pia6821_device::read_alt), FUNC(pia6821_device::write_alt));
 	map(0xe7cc, 0xe7cf).rw("pia_1", FUNC(pia6821_device::read_alt), FUNC(pia6821_device::write_alt));
+	map(0xe7d0, 0xe7d3).rw(m_wd2793, FUNC(wd2793_device::read), FUNC(wd2793_device::write));
+	map(0xe7d8, 0xe7d8).rw(FUNC(to9_state::wd2793_control_r), FUNC(to9_state::wd2793_control_w));
 	map(0xe7da, 0xe7dd).rw(FUNC(to9_state::to9_vreg_r), FUNC(to9_state::to9_vreg_w));
 	map(0xe7de, 0xe7df).rw(FUNC(to9_state::to9_kbd_r), FUNC(to9_state::to9_kbd_w));
 	map(0xe7e4, 0xe7e7).rw(FUNC(to9_state::to9_gatearray_r), FUNC(to9_state::to9_gatearray_w));
@@ -1223,6 +1226,17 @@ INPUT_PORTS_END
 
 /* ------------ driver ------------ */
 
+static void wd2793_formats(format_registration &fr)
+{
+	fr.add_mfm_containers();
+	fr.add(FLOPPY_THOMSON_35_FORMAT);
+}
+
+static void wd2793_drives(device_slot_interface &device)
+{
+	device.option_add("35dd", FLOPPY_35_DD);
+}
+
 void to9_state::to9(machine_config &config)
 {
 	to7(config);
@@ -1246,6 +1260,11 @@ void to9_state::to9(machine_config &config)
 
 	/* internal ram */
 	m_ram->set_default_size("192K").set_extra_options("128K");
+
+	WD2793(config, m_wd2793, 16_MHz_XTAL / 16);
+	FLOPPY_CONNECTOR(config, "wd2793:0", wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, "wd2793:1", wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, "wd2793:2", wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
 }
 
 

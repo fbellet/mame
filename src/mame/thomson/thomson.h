@@ -15,9 +15,11 @@
 
 #include "cpu/m6809/m6809.h"
 #include "imagedev/cassette.h"
+#include "imagedev/floppy.h"
 #include "machine/6821pia.h"
 #include "machine/input_merger.h"
 #include "machine/mc6846.h"
+#include "machine/wd_fdc.h"
 #include "machine/ram.h"
 #include "sound/dac.h"
 #include "bus/thomson/extension.h"
@@ -38,6 +40,7 @@
 /* bank-switching */
 #define THOM_CART_BANK  "bank2" /* cartridge ROM */
 #define THOM_RAM_BANK   "bank3" /* data RAM */
+#define THOM_FLOP_BANK  "bank4" /* internal floppy controller ROM */
 #define THOM_BASE_BANK  "bank5" /* system RAM */
 
 /* bank-switching */
@@ -384,13 +387,16 @@ class to9_state : public thomson_state
 public:
 	to9_state(const machine_config &mconfig, device_type type, const char *tag) :
 		thomson_state(mconfig, type, tag),
+		m_wd2793(*this, "wd2793"),
+		m_floppy(*this, "wd2793:%u", 0U),
 		m_centronics(*this, "centronics"),
 		m_cent_data_out(*this, "cent_data_out"),
 		m_syslobank(*this, TO8_SYS_LO),
 		m_syshibank(*this, TO8_SYS_HI),
 		m_datalobank(*this, TO8_DATA_LO),
 		m_datahibank(*this, TO8_DATA_HI),
-		m_biosbank(*this, TO8_BIOS_BANK)
+		m_biosbank(*this, TO8_BIOS_BANK),
+		m_flopbank(*this, THOM_FLOP_BANK)
 	{
 	}
 
@@ -400,6 +406,8 @@ public:
 	void to9p(machine_config &config);
 
 protected:
+	optional_device<wd2793_device> m_wd2793;
+	optional_device_array<floppy_connector, 3> m_floppy;
 	optional_device<centronics_device> m_centronics;
 	optional_device<output_latch_device> m_cent_data_out;
 
@@ -408,6 +416,7 @@ protected:
 	optional_memory_bank m_datalobank;
 	optional_memory_bank m_datahibank;
 	optional_memory_bank m_biosbank;
+	optional_memory_bank m_flopbank;
 
 	int m_centronics_busy = 0;
 
@@ -521,6 +530,10 @@ protected:
 	int to9_kbd_get_key();
 	void to9_kbd_reset();
 	void to9_kbd_init();
+
+	void wd2793_control_w(u8 data);
+	u8 wd2793_control_r();
+	u8 m_wd2793_control;
 };
 
 class mo6_state : public to9_state
