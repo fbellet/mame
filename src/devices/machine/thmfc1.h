@@ -59,9 +59,13 @@ private:
 		S_IDLE,
 		S_WAIT_HEADER_SYNC,
 		S_VERIFY_HEADER,
-		S_SKIP_GAP,
-		S_WAIT_SECTOR_SYNC,
+		S_SKIP_READ_GAP,
+		S_SKIP_WRITE_GAP,
+		S_WAIT_READ_SECTOR_SYNC,
 		S_READ_SECTOR,
+		S_WAIT_WRITE_SECTOR_SYNC,
+		S_WRITE_SECTOR,
+		S_WRITE_SECTOR_CRC,
 	};
 
 	required_device_array<floppy_connector, 2> m_floppy;
@@ -72,12 +76,15 @@ private:
 	int m_state;
 
 	u16 m_shift_reg, m_crc, m_bit_counter;
+	u8 m_shift_data_reg, m_shift_clk_reg;
 	u8 m_data_reg;
+	u8 m_bit;
 
 	u8 m_cmd0, m_cmd1, m_cmd2, m_stat0;
 	u8 m_data, m_clk, m_sect, m_trck, m_cell;
 
 	bool m_data_separator_phase;
+	bool m_use_shift_clk_reg;
 
 	u8 clk_bits() const;
 
@@ -99,6 +106,7 @@ private:
 
 	void sync();
 	bool read_one_bit(u64 limit, u64 &next_flux_change);
+	bool write_one_bit(u64 limit);
 };
 
 DECLARE_DEVICE_TYPE(THMFC1, thmfc1_device)
