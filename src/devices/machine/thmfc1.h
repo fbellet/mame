@@ -57,13 +57,15 @@ private:
 
 	enum {
 		S_IDLE,
-		S_WAIT_HEADER_SYNC,
-		S_VERIFY_HEADER,
-		S_SKIP_READ_GAP,
-		S_SKIP_WRITE_GAP,
-		S_WAIT_READ_SECTOR_SYNC,
+		S_READ_WAIT_HEADER_SYNC,
+		S_READ_VERIFY_HEADER,
+		S_READ_SKIP_GAP,
+		S_READ_WAIT_SECTOR_SYNC,
+		S_READ_VERIFY_SECTOR,
 		S_READ_SECTOR,
-		S_WAIT_WRITE_SECTOR_SYNC,
+		S_READ_SECTOR_CRC,
+		S_WRITE_SKIP_GAP,
+		S_WRITE_SECTOR_SYNC,
 		S_WRITE_SECTOR,
 		S_WRITE_SECTOR_CRC,
 	};
@@ -82,6 +84,7 @@ private:
 
 	u8 m_cmd0, m_cmd1, m_cmd2, m_stat0;
 	u8 m_data, m_clk, m_sect, m_trck, m_cell;
+	u16 m_sect_size;
 
 	bool m_data_separator_phase;
 	bool m_use_shift_clk_reg;
