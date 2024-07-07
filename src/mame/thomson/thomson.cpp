@@ -479,18 +479,6 @@ static INPUT_PORTS_START ( t9000 )
 	PORT_INCLUDE ( to7 )
 INPUT_PORTS_END
 
-static void to8_floppy_drives(device_slot_interface &device)
-{
-	device.option_add("dd90_352", FLOPPY_35_DD);
-	//  device.option_add("qd90_280", FLOPPY_28_QDD);
-}
-
-static void to35_floppy_formats(format_registration &fr)
-{
-	fr.add_pc_formats();
-	fr.add(FLOPPY_THOMSON_35_FORMAT);
-}
-
 /* ------------ driver ------------ */
 
 static const struct cassette_image::Options to7_cassette_options =
@@ -1538,9 +1526,9 @@ void to9_state::to9p(machine_config &config)
 	m_pia_sys->irqa_handler().set_nop();
 	m_pia_sys->irqb_handler().set("mainfirq", FUNC(input_merger_device::in_w<1>));
 
-	THMFC1(config, "thmfc1", 16_MHz_XTAL);
-	FLOPPY_CONNECTOR(config, "thmfc1:0", to8_floppy_drives, "dd90_352", to35_floppy_formats, true).enable_sound(true);
-	FLOPPY_CONNECTOR(config, "thmfc1:1", to8_floppy_drives, nullptr,    to35_floppy_formats, false).enable_sound(true);
+	THMFC1(config, "thmfc1", 16_MHz_XTAL );
+	FLOPPY_CONNECTOR(config, "thmfc1:0", thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, "thmfc1:1", thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
 
 	m_extension->option_remove("cd90_015");
 	m_extension->option_remove("cq90_028");
