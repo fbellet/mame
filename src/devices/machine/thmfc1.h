@@ -68,6 +68,7 @@ private:
 		S_WRITE_SECTOR_SYNC,
 		S_WRITE_SECTOR,
 		S_WRITE_SECTOR_CRC,
+		S_FORMAT,
 	};
 
 	required_device_array<floppy_connector, 2> m_floppy;
@@ -88,6 +89,10 @@ private:
 
 	bool m_data_separator_phase;
 	bool m_use_shift_clk_reg;
+
+	attotime m_write_buffer[32];
+	u64 m_write_buffer_start;
+	int m_write_buffer_idx;
 
 	u8 clk_bits() const;
 

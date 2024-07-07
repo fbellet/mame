@@ -79,6 +79,9 @@ void thmfc1_device::device_start()
 	save_item(NAME(m_bit_counter));
 	save_item(NAME(m_data_reg));
 	save_item(NAME(m_data_separator_phase));
+	save_item(NAME(m_write_buffer));
+	save_item(NAME(m_write_buffer_idx));
+	save_item(NAME(m_write_buffer_start));
 }
 
 void thmfc1_device::device_reset()
@@ -103,6 +106,8 @@ void thmfc1_device::device_reset()
 	m_bit_counter = 0;
 	m_data_reg = 0;
 	m_data_separator_phase = false;
+	m_write_buffer_idx = 0;
+	m_write_buffer_start = 0;
 	m_state = S_IDLE;
 	m_cur_floppy = nullptr;
 }
@@ -140,6 +145,17 @@ void thmfc1_device::cmd0_w(u8 data)
 	if(m_stat0 & S0_FREE) {
 		switch(m_cmd0 & 3) {
 		case 0:
+			if(m_cmd0 & C0_WGC) {
+				LOGCOMMAND("format start h=%d t=%d sz=%d\n",
+						 m_cmd1 & C1_SIDE ? 1 : 0,
+						 m_trck,
+						 128 << ((m_cmd1 >> 5) & 3));
+				m_state = S_FORMAT;
+				m_use_shift_clk_reg = (m_clk == 0x0a);
+				m_window_start = m_last_sync;
+				m_write_buffer_idx = 0;
+			} else
+				m_state = S_IDLE;
 			break;
 		case 1:
 			LOGCOMMAND("write_sector start h=%d t=%d s=%d sz=%d\n",
@@ -148,7 +164,7 @@ void thmfc1_device::cmd0_w(u8 data)
 					 m_sect,
 					 128 << ((m_cmd1 >> 5) & 3));
 			m_state = S_READ_WAIT_HEADER_SYNC;
-			LOGSTATE("wait_header_sync start\n");
+			LOGSTATE("read_wait_header_sync start\n");
 			if(m_stat0 & S0_FREE)
 				LOGSTAT0("free unset in stat0\n");
 			m_stat0 &= ~S0_FREE;
@@ -164,7 +180,7 @@ void thmfc1_device::cmd0_w(u8 data)
 					 m_sect,
 					 128 << ((m_cmd1 >> 5) & 3));
 			m_state = S_READ_WAIT_HEADER_SYNC;
-			LOGSTATE("wait_header_sync start\n");
+			LOGSTATE("read_wait_header_sync start\n");
 			if(m_stat0 & S0_FREE)
 				LOGSTAT0("free unset in stat0\n");
 			m_stat0 &= ~S0_FREE;
@@ -215,9 +231,6 @@ void thmfc1_device::cmd2_w(u8 data)
 		if(m_cmd2 & C2_MTON) {
 			m_cur_floppy->mon_w(0);
 			m_timer_motoroff->adjust(attotime::never);
-#if 0
-			m_window_start = m_last_sync;
-#endif
 		}
 		m_cur_floppy->ss_w(m_cmd2 & C2_SISELB ? 0 : 1);
 		m_cur_floppy->dir_w(m_cmd2 & C2_DIRECB ? 0 : 1);
@@ -381,8 +394,8 @@ bool thmfc1_device::read_one_bit(u64 limit, u64 &next_flux_change)
 			LOGSTAT0("sync unset in stat0\n");
 		m_stat0 &= ~S0_SYNC;
 	}
-	if(m_state == S_READ_SECTOR || m_state == S_READ_VERIFY_SECTOR)
-		if((m_bit_counter & 0xf) == 0 && ~m_stat0 & S0_BYTE) {
+	if(m_state == S_IDLE || m_state == S_READ_SECTOR || m_state == S_READ_VERIFY_SECTOR)
+		if((m_bit_counter & 0xe) == 0 && m_data_separator_phase && ~m_stat0 & S0_BYTE) {
 			LOGSTAT0("byte set in stat0 (data=0x%02x)\n", m_data_reg);
 			m_stat0 |= S0_BYTE;
 			m_data = m_data_reg;
@@ -401,7 +414,6 @@ bool thmfc1_device::write_one_bit(u64 limit)
 		return true;
 
 	LOGFLUX("flux window_start %d window_end %d limit %d\n", m_window_start, window_end, limit);
-	attotime write_buffer = cycles_to_time (m_window_start + ((m_cell & 0x7f) >> 1));
 	m_bit_counter++;
 
 	if(m_data_separator_phase) {
@@ -415,7 +427,7 @@ bool thmfc1_device::write_one_bit(u64 limit)
 			m_bit = (m_shift_clk_reg >> 7);
 		else
 			m_bit = !(m_bit || (m_shift_data_reg >> 7)); // MFM
-	if((m_bit_counter & 0xf) == 0) {
+	if((m_bit_counter & 0xe) == 0 && m_data_separator_phase) {
 		if(~m_stat0 & S0_BYTE)
 			LOGSTAT0("byte set in stat0\n");
 		m_stat0 |= S0_BYTE;
@@ -430,7 +442,14 @@ bool thmfc1_device::write_one_bit(u64 limit)
 	else
 		m_shift_clk_reg = (m_shift_clk_reg & 0x7f) << 1 | (m_shift_clk_reg >> 7);
 
-	m_cur_floppy->write_flux(cycles_to_time(m_window_start), cycles_to_time(window_end), m_bit, &write_buffer);
+	if((m_bit_counter & 0x1f) == 1)
+		m_write_buffer_start = m_window_start;
+	if(m_bit)
+		m_write_buffer[m_write_buffer_idx++] = cycles_to_time (m_window_start + ((m_cell & 0x7f) >> 1));
+	if((m_bit_counter & 0x1f) == 0) {
+		m_cur_floppy->write_flux(cycles_to_time(m_write_buffer_start), cycles_to_time(window_end), m_write_buffer_idx, m_write_buffer);
+		m_write_buffer_idx = 0;
+	}
 
 	m_window_start = window_end;
 	m_last_sync = window_end;
@@ -458,12 +477,10 @@ void thmfc1_device::sync()
 	while(m_last_sync < next_sync)
 		switch(m_state) {
 		case S_IDLE:
-#if 0
-			if((m_cmd2 & C2_MTON) && (m_cell & 0x7f)) {
+			if(m_cur_floppy && m_cur_floppy->idx_r() && (m_cell & 0x7f)) {
 				if(read_one_bit(next_sync, next_flux_change))
 					return;
 			} else
-#endif
 				m_last_sync = next_sync;
 			break;
 
@@ -564,6 +581,7 @@ void thmfc1_device::sync()
 					LOGSTAT0("dreq set in stat0\n");
 				m_stat0 |= S0_DREQ;
 				LOGSTATE("read_wait_sector_sync end (data=0x%02x clk=0x%02x)\n", m_data, m_clk);
+				LOGCRC("crc=0x%04x\n", m_crc);
 				m_state = S_READ_VERIFY_SECTOR;
 			}
 			if(m_bit_counter == 42 << 4) {
@@ -646,6 +664,7 @@ void thmfc1_device::sync()
 				m_bit_counter = 0;
 				m_shift_data_reg = 0x00;
 				m_state = S_WRITE_SECTOR_SYNC;
+				m_write_buffer_idx = 0;
 				LOGSTATE("write_skip_gap end\n");
 			}
 			break;
@@ -705,6 +724,17 @@ void thmfc1_device::sync()
 				LOGSTAT0("free set in stat0\n");
 			m_stat0 |= S0_FREE;
 			m_state = S_IDLE;
+			break;
+
+		case S_FORMAT:
+			if(write_one_bit(next_sync))
+				return;
+			if(m_bit_counter & 0xf)
+				break;
+			LOGSTATE("format shift_data_reg=0x%02x\n", m_shift_data_reg);
+			m_shift_data_reg = m_data;
+			m_shift_clk_reg = m_clk;
+			m_use_shift_clk_reg = (m_clk == 0x0a);
 			break;
 		}
 }
