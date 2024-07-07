@@ -19,6 +19,7 @@
 #include "machine/6821pia.h"
 #include "machine/input_merger.h"
 #include "machine/mc6846.h"
+#include "machine/thmfc1.h"
 #include "machine/wd_fdc.h"
 #include "machine/ram.h"
 #include "sound/dac.h"
@@ -247,6 +248,7 @@ protected:
 	int m_old_cart_bank = 0;
 	int m_old_cart_bank_was_read_only = 0;
 	int m_old_ram_bank = 0;
+	int m_old_floppy_bank = 0;
 	/* buffer storing demodulated bits, only for k7 and with speed hack */
 	uint32_t m_to7_k7_bitsize = 0;
 	uint8_t* m_to7_k7_bits = 0;
@@ -387,8 +389,9 @@ class to9_state : public thomson_state
 public:
 	to9_state(const machine_config &mconfig, device_type type, const char *tag) :
 		thomson_state(mconfig, type, tag),
+		m_thmfc1(*this, "thmfc1"),
 		m_wd2793(*this, "wd2793"),
-		m_floppy(*this, "wd2793:%u", 0U),
+		m_floppy(*this, "%u", 0U),
 		m_centronics(*this, "centronics"),
 		m_cent_data_out(*this, "cent_data_out"),
 		m_syslobank(*this, TO8_SYS_LO),
@@ -406,6 +409,7 @@ public:
 	void to9p(machine_config &config);
 
 protected:
+	optional_device<thmfc1_device> m_thmfc1;
 	optional_device<wd2793_device> m_wd2793;
 	optional_device_array<floppy_connector, 3> m_floppy;
 	optional_device<centronics_device> m_centronics;
@@ -440,6 +444,7 @@ protected:
 	uint8_t  m_to8_bios_bank = 0;
 
 	TIMER_CALLBACK_MEMBER( to8_kbd_timer_cb );
+	void to8_update_floppy_bank_postload();
 	void to8_update_ram_bank_postload();
 	void to8_update_cart_bank_postload();
 	void to8_cartridge_w(offs_t offset, uint8_t data);
@@ -471,6 +476,7 @@ protected:
 	void to8_kbd_set_ack( int data );
 	void to8_kbd_reset();
 	void to8_kbd_init();
+	void to8_update_floppy_bank();
 	void to8_update_ram_bank();
 	void to8_update_cart_bank();
 

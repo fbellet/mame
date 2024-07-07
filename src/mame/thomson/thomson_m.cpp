@@ -2627,6 +2627,36 @@ void to9_state::to8_kbd_init()
 
 /* ------------ RAM / ROM banking ------------ */
 
+void to9_state::to8_update_floppy_bank()
+{
+	int bank = (m_to8_reg_sys1 & 0x80) + m_to8_bios_bank;
+
+	if ( bank != m_old_floppy_bank )
+	{
+		LOGMASKED(LOG_BANK, "to8_update_floppy_bank: floppy ROM is %s bank %i\n",
+			(m_to8_reg_sys1 & 0x80) ? "external" : "internal", bank & 0x1);
+		if (bank & 0x80)
+			m_extension->rom_map(m_maincpu->space(AS_PROGRAM), 0xe000, 0xe7bf);
+		else
+		{
+			address_space& space = m_maincpu->space(AS_PROGRAM);
+			space.install_read_bank( 0xe000, 0xe7bf, m_flopbank );
+			m_flopbank->set_entry( bank & 1 );
+		}
+		m_old_floppy_bank = bank;
+	}
+}
+
+
+
+void to9_state::to8_update_floppy_bank_postload()
+{
+	to8_update_floppy_bank();
+}
+
+
+
+
 void to9_state::to8_update_ram_bank()
 {
 	address_space& space = m_maincpu->space(AS_PROGRAM);
@@ -2950,6 +2980,7 @@ void to9_state::to8_gatearray_w(offs_t offset, uint8_t data)
 
 	case 3: /* system register 1 */
 		m_to8_reg_sys1 = data;
+		to8_update_floppy_bank();
 		to8_update_ram_bank();
 		to8_update_cart_bank();
 		break;
@@ -3104,6 +3135,7 @@ void to9_state::to8_timer_port_out(uint8_t data)
 	thom_set_mode_point( data & 1 );       /* bit 0: video bank switch */
 	m_biosbank->set_entry( m_to8_bios_bank );
 	m_to8_soft_select = (data & 0x04) ? 1 : 0; /* bit 2: internal ROM select */
+	to8_update_floppy_bank();
 	to8_update_cart_bank();
 	to8_kbd_set_ack(ack);
 }
@@ -3174,8 +3206,14 @@ MACHINE_RESET_MEMBER( to9_state, to8 )
 	m_to8_bios_bank = 0;
 	to8_update_ram_bank();
 	to8_update_cart_bank();
+	to8_update_floppy_bank();
 	m_biosbank->set_entry( 0 );
 	/* thom_cart_bank not reset */
+
+	/* floppy */
+	m_flopbank->set_entry( 0 );
+	m_thmfc1->set_floppy(0, m_floppy[0]->get_device());
+	m_thmfc1->set_floppy(1, m_floppy[1]->get_device());
 }
 
 
@@ -3220,6 +3258,7 @@ MACHINE_START_MEMBER( to9_state, to8 )
 	m_syslobank->configure_entry( 0,  ram + 0x6000);
 	m_syshibank->configure_entry( 0,  ram + 0x4000);
 	m_biosbank->configure_entries( 0,  2, mem + 0x20800, 0x2000 );
+	m_flopbank->configure_entries( 0,  2, mem + 0x20000, 0x2000 );
 	m_cartbank->set_entry( 0 );
 	m_vrambank->set_entry( 0 );
 	m_syslobank->set_entry( 0 );
@@ -3227,6 +3266,7 @@ MACHINE_START_MEMBER( to9_state, to8 )
 	m_datalobank->set_entry( 0 );
 	m_datahibank->set_entry( 0 );
 	m_biosbank->set_entry( 0 );
+	m_flopbank->set_entry( 0 );
 
 	/* save-state */
 	save_item(NAME(m_thom_cart_nb_banks));
@@ -3246,6 +3286,7 @@ MACHINE_START_MEMBER( to9_state, to8 )
 	save_pointer(NAME(cartmem), 0x10000 );
 	machine().save().register_postload(save_prepost_delegate(FUNC(to9_state::to8_update_ram_bank_postload), this));
 	machine().save().register_postload(save_prepost_delegate(FUNC(to9_state::to8_update_cart_bank_postload), this));
+	machine().save().register_postload(save_prepost_delegate(FUNC(to9_state::to8_update_floppy_bank_postload), this));
 }
 
 

@@ -1261,10 +1261,11 @@ void to9_state::to9(machine_config &config)
 	/* internal ram */
 	m_ram->set_default_size("192K").set_extra_options("128K");
 
+	/* floppy */
 	WD2793(config, m_wd2793, 16_MHz_XTAL / 16);
-	FLOPPY_CONNECTOR(config, "wd2793:0", wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, "wd2793:1", wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, "wd2793:2", wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[0], wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[1], wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[2], wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
 }
 
 
@@ -1343,9 +1344,18 @@ void to9_state::to8_map(address_map &map)
 	map(0x8000, 0x9fff).bankr(TO8_SYS_HI).w(FUNC(to9_state::to8_sys_hi_w));
 	map(0xa000, 0xbfff).bankr(TO8_DATA_LO).w(FUNC(to9_state::to8_data_lo_w));
 	map(0xc000, 0xdfff).bankr(TO8_DATA_HI).w(FUNC(to9_state::to8_data_hi_w));
+	map(0xe000, 0xe7bf).bankr(THOM_FLOP_BANK); /* 2 * 2 KB */
 	map(0xe7c0, 0xe7c7).rw(m_mc6846, FUNC(mc6846_device::read), FUNC(mc6846_device::write));
 	map(0xe7c8, 0xe7cb).rw("pia_0", FUNC(pia6821_device::read_alt), FUNC(pia6821_device::write_alt));
 	map(0xe7cc, 0xe7cf).rw("pia_1", FUNC(pia6821_device::read_alt), FUNC(pia6821_device::write_alt));
+	map(0xe7d0, 0xe7d0).rw("thmfc1", FUNC(thmfc1_device::stat0_r), FUNC(thmfc1_device::cmd0_w));
+	map(0xe7d1, 0xe7d1).rw("thmfc1", FUNC(thmfc1_device::stat1_r), FUNC(thmfc1_device::cmd1_w));
+	map(0xe7d2, 0xe7d2).w("thmfc1", FUNC(thmfc1_device::cmd2_w));
+	map(0xe7d3, 0xe7d3).rw("thmfc1", FUNC(thmfc1_device::rdata_r), FUNC(thmfc1_device::wdata_w));
+	map(0xe7d4, 0xe7d4).w("thmfc1", FUNC(thmfc1_device::wclk_w));
+	map(0xe7d5, 0xe7d5).w("thmfc1", FUNC(thmfc1_device::wsect_w));
+	map(0xe7d6, 0xe7d6).w("thmfc1", FUNC(thmfc1_device::wtrck_w));
+	map(0xe7d7, 0xe7d7).w("thmfc1", FUNC(thmfc1_device::wcell_w));
 	map(0xe7da, 0xe7dd).rw(FUNC(to9_state::to8_vreg_r), FUNC(to9_state::to8_vreg_w));
 	map(0xe7e4, 0xe7e7).rw(FUNC(to9_state::to8_gatearray_r), FUNC(to9_state::to8_gatearray_w));
 /*  map(0xe7f0, 0xe7f7).rw(FUNC(to9_state::to9_ieee_r), FUNC(to9_state::to9_ieee_w )); */
@@ -1453,6 +1463,17 @@ INPUT_PORTS_END
 
 /* ------------ driver ------------ */
 
+static void thmfc1_formats(format_registration &fr)
+{
+	fr.add_mfm_containers();
+	fr.add(FLOPPY_THOMSON_35_FORMAT);
+}
+
+static void thmfc1_drives(device_slot_interface &device)
+{
+	device.option_add("35dd", FLOPPY_35_DD);
+}
+
 void to9_state::to8(machine_config &config)
 {
 	to7(config);
@@ -1484,6 +1505,11 @@ void to9_state::to8(machine_config &config)
 	SOFTWARE_LIST(config, "to8_qd_list").set_original("to8_qd");
 	SOFTWARE_LIST(config.replace(), "to7_cass_list").set_compatible("to7_cass");
 	SOFTWARE_LIST(config.replace(), "to7_qd_list").set_compatible("to7_qd");
+
+	/* floppy */
+	THMFC1(config, m_thmfc1, 16_MHz_XTAL );
+	FLOPPY_CONNECTOR(config, m_floppy[0], thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[1], thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
 }
 
 void to9_state::to8d(machine_config &config)
