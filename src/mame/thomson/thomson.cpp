@@ -1498,6 +1498,14 @@ void to9_state::to9p_map(address_map &map)
 	map(0xe7c0, 0xe7c7).rw(m_mc6846, FUNC(mc6846_device::read), FUNC(mc6846_device::write));
 	map(0xe7c8, 0xe7cb).rw("pia_0", FUNC(pia6821_device::read_alt), FUNC(pia6821_device::write_alt));
 	map(0xe7cc, 0xe7cf).rw("pia_1", FUNC(pia6821_device::read_alt), FUNC(pia6821_device::write_alt));
+	map(0xe7d0, 0xe7d0).rw(m_thmfc1, FUNC(thmfc1_device::stat0_r), FUNC(thmfc1_device::cmd0_w));
+	map(0xe7d1, 0xe7d1).rw(m_thmfc1, FUNC(thmfc1_device::stat1_r), FUNC(thmfc1_device::cmd1_w));
+	map(0xe7d2, 0xe7d2).w(m_thmfc1, FUNC(thmfc1_device::cmd2_w));
+	map(0xe7d3, 0xe7d3).rw(m_thmfc1, FUNC(thmfc1_device::rdata_r), FUNC(thmfc1_device::wdata_w));
+	map(0xe7d4, 0xe7d4).w(m_thmfc1, FUNC(thmfc1_device::wclk_w));
+	map(0xe7d5, 0xe7d5).w(m_thmfc1, FUNC(thmfc1_device::wsect_w));
+	map(0xe7d6, 0xe7d6).w(m_thmfc1, FUNC(thmfc1_device::wtrck_w));
+	map(0xe7d7, 0xe7d7).w(m_thmfc1, FUNC(thmfc1_device::wcell_w));
 	map(0xe7da, 0xe7dd).rw(FUNC(to9_state::to8_vreg_r), FUNC(to9_state::to8_vreg_w));
 	map(0xe7de, 0xe7df).rw(m_to9_kbd, FUNC(to9_keyboard_device::kbd_acia_r), FUNC(to9_keyboard_device::kbd_acia_w));
 	map(0xe7e4, 0xe7e7).rw(FUNC(to9_state::to8_gatearray_r), FUNC(to9_state::to8_gatearray_w));
@@ -1589,6 +1597,11 @@ void to9_state::to9p(machine_config &config)
 	SOFTWARE_LIST(config, "to8_qd_list").set_original("to8_qd");
 	SOFTWARE_LIST(config.replace(), "to7_cass_list").set_compatible("to7_cass");
 	SOFTWARE_LIST(config.replace(), "to7_qd_list").set_compatible("to7_qd");
+
+	/* floppy */
+	THMFC1(config, m_thmfc1, 16_MHz_XTAL );
+	FLOPPY_CONNECTOR(config, m_floppy[0], thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[1], thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
 }
 
 COMP( 1986, to9p, 0, 0, to9p, to9p, to9_state, empty_init, "Thomson", "TO9+", MACHINE_SUPPORTS_SAVE )
