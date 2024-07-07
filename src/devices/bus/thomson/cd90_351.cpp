@@ -17,7 +17,7 @@ DEFINE_DEVICE_TYPE(CD90_351, cd90_351_device, "cd90_351", "Thomson CD 90-351 Dis
 cd90_351_device::cd90_351_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, CD90_351, tag, owner, 16000000),
 	thomson_extension_interface(mconfig, *this),
-	m_fdc(*this, "fdc"),
+	m_thmfc1(*this, "thmfc1"),
 	m_floppy(*this, "%u", 0U),
 	m_rom(*this, "rom"),
 	m_rom_bank(*this, "rom_bank")
@@ -42,14 +42,14 @@ void cd90_351_device::rom_map(address_map &map)
 
 void cd90_351_device::io_map(address_map &map)
 {
-	map(0x10, 0x10).rw("fdc", FUNC(thmfc1_device::stat0_r), FUNC(thmfc1_device::cmd0_w));
-	map(0x11, 0x11).rw("fdc", FUNC(thmfc1_device::stat1_r), FUNC(thmfc1_device::cmd1_w));
-	map(0x12, 0x12).w("fdc", FUNC(thmfc1_device::cmd2_w));
-	map(0x13, 0x13).rw("fdc", FUNC(thmfc1_device::rdata_r), FUNC(thmfc1_device::wdata_w));
-	map(0x14, 0x14).w("fdc", FUNC(thmfc1_device::wclk_w));
-	map(0x15, 0x15).w("fdc", FUNC(thmfc1_device::wsect_w));
-	map(0x16, 0x16).w("fdc", FUNC(thmfc1_device::wtrck_w));
-	map(0x17, 0x17).w("fdc", FUNC(thmfc1_device::wcell_w));
+	map(0x10, 0x10).rw("thmfc1", FUNC(thmfc1_device::stat0_r), FUNC(thmfc1_device::cmd0_w));
+	map(0x11, 0x11).rw("thmfc1", FUNC(thmfc1_device::stat1_r), FUNC(thmfc1_device::cmd1_w));
+	map(0x12, 0x12).w("thmfc1", FUNC(thmfc1_device::cmd2_w));
+	map(0x13, 0x13).rw("thmfc1", FUNC(thmfc1_device::rdata_r), FUNC(thmfc1_device::wdata_w));
+	map(0x14, 0x14).w("thmfc1", FUNC(thmfc1_device::wclk_w));
+	map(0x15, 0x15).w("thmfc1", FUNC(thmfc1_device::wsect_w));
+	map(0x16, 0x16).w("thmfc1", FUNC(thmfc1_device::wtrck_w));
+	map(0x17, 0x17).w("thmfc1", FUNC(thmfc1_device::wcell_w));
 	map(0x18, 0x18).w(FUNC(cd90_351_device::bank_w));
 }
 
@@ -72,23 +72,23 @@ void cd90_351_device::floppy_formats(format_registration &fr)
 
 void cd90_351_device::device_add_mconfig(machine_config &config)
 {
-	THMFC1(config, m_fdc, 16_MHz_XTAL);
+	THMFC1(config, m_thmfc1, 16_MHz_XTAL);
 	FLOPPY_CONNECTOR(config, m_floppy[0], floppy_drives, "dd90_352", floppy_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, m_floppy[1], floppy_drives, nullptr,    floppy_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[1], floppy_drives, "dd90_352", floppy_formats).enable_sound(true);
 }
 
 void cd90_351_device::device_start()
 {
 	m_rom_bank->configure_entries(0, 4, m_rom->base(), 0x800);
-	m_fdc->set_floppy(0, m_floppy[0]->get_device());
-	m_fdc->set_floppy(1, m_floppy[1]->get_device());
+	m_thmfc1->set_floppy(0, m_floppy[0]->get_device());
+	m_thmfc1->set_floppy(1, m_floppy[1]->get_device());
 }
 
 void cd90_351_device::device_reset()
 {
 	m_rom_bank->set_entry(0);
-	m_fdc->set_floppy(0, m_floppy[0]->get_device());
-	m_fdc->set_floppy(1, m_floppy[1]->get_device());
+	m_thmfc1->set_floppy(0, m_floppy[0]->get_device());
+	m_thmfc1->set_floppy(1, m_floppy[1]->get_device());
 }
 
 void cd90_351_device::bank_w(u8 data)

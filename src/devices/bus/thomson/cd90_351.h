@@ -29,7 +29,7 @@ protected:
 	virtual void device_reset() override;
 
 private:
-	required_device<thmfc1_device> m_fdc;
+	required_device<thmfc1_device> m_thmfc1;
 	required_device_array<floppy_connector, 2> m_floppy;
 	required_memory_region m_rom;
 	memory_bank_creator m_rom_bank;
