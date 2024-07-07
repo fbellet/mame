@@ -1912,6 +1912,35 @@ MACHINE_START_MEMBER( to9_state, to9 )
 
 /* ------------ RAM / ROM banking ------------ */
 
+void to9_state::to8_update_flop_bank()
+{
+	int floppy_bank = (m_to8_reg_sys1 & 0x80);
+
+	if ( floppy_bank != m_old_floppy_bank )
+	{
+		LOGMASKED(LOG_BANK, "to8_update_flop_bank: floppy ROM is %s bank %i\n",
+			floppy_bank ? "external" : "internal", m_to8_bios_bank);
+		if ( floppy_bank & 0x80 )
+			m_extension->rom_map(m_maincpu->space(AS_PROGRAM), 0xe000, 0xe7bf);
+		else
+		{
+			address_space& space = m_maincpu->space(AS_PROGRAM);
+			space.install_read_bank( 0xe000, 0xe7bf, m_biosbank );
+		}
+		m_old_floppy_bank = floppy_bank;
+	}
+}
+
+
+
+void to9_state::to8_update_flop_bank_postload()
+{
+	to8_update_flop_bank();
+}
+
+
+
+
 void to9_state::to8_update_ram_bank()
 {
 	address_space& space = m_maincpu->space(AS_PROGRAM);
@@ -2235,6 +2264,7 @@ void to9_state::to8_gatearray_w(offs_t offset, uint8_t data)
 
 	case 3: /* system register 1 */
 		m_to8_reg_sys1 = data;
+		to8_update_flop_bank();
 		to8_update_ram_bank();
 		to8_update_cart_bank();
 		break;
@@ -2389,6 +2419,7 @@ void to9_state::to8_timer_port_out(uint8_t data)
 	thom_set_mode_point( data & 1 );       /* bit 0: video bank switch */
 	m_biosbank->set_entry( m_to8_bios_bank );
 	m_to8_soft_select = (data & 0x04) ? 1 : 0; /* bit 2: internal ROM select */
+	to8_update_flop_bank();
 	to8_update_cart_bank();
 	m_to8_kbd->set_ack(ack);
 }
@@ -2458,6 +2489,7 @@ MACHINE_RESET_MEMBER( to9_state, to8 )
 	m_to8_bios_bank = 0;
 	to8_update_ram_bank();
 	to8_update_cart_bank();
+	to8_update_flop_bank();
 	m_biosbank->set_entry( 0 );
 	/* thom_cart_bank not reset */
 }
@@ -2530,6 +2562,7 @@ MACHINE_START_MEMBER( to9_state, to8 )
 	save_pointer(NAME(cartmem), 0x10000 );
 	machine().save().register_postload(save_prepost_delegate(FUNC(to9_state::to8_update_ram_bank_postload), this));
 	machine().save().register_postload(save_prepost_delegate(FUNC(to9_state::to8_update_cart_bank_postload), this));
+	machine().save().register_postload(save_prepost_delegate(FUNC(to9_state::to8_update_flop_bank_postload), this));
 }
 
 

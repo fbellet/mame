@@ -1356,6 +1356,17 @@ INPUT_PORTS_END
 
 /* ------------ driver ------------ */
 
+static void thmfc1_formats(format_registration &fr)
+{
+	fr.add_mfm_containers();
+	fr.add(FLOPPY_THOMSON_35_FORMAT);
+}
+
+static void thmfc1_drives(device_slot_interface &device)
+{
+	device.option_add("35dd", FLOPPY_35_DD);
+}
+
 void to9_state::to8(machine_config &config)
 {
 	to7_base(config, false);
@@ -1374,9 +1385,10 @@ void to9_state::to8(machine_config &config)
 	m_pia_sys->cb2_handler().set_nop();
 	m_pia_sys->irqa_handler().set_nop();
 
-	THMFC1(config, "thmfc1", 16_MHz_XTAL);
-	FLOPPY_CONNECTOR(config, "thmfc1:0", to8_floppy_drives, "dd90_352", to35_floppy_formats, false).enable_sound(true);
-	FLOPPY_CONNECTOR(config, "thmfc1:1", to8_floppy_drives, nullptr,    to35_floppy_formats, false).enable_sound(true);
+	/* floppy */
+	THMFC1(config, "thmfc1", 16_MHz_XTAL );
+	FLOPPY_CONNECTOR(config, "thmfc1:0", thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, "thmfc1:1", thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
 
 	m_extension->option_remove("cd90_015");
 	m_extension->option_remove("cq90_028");

@@ -249,6 +249,7 @@ protected:
 	int m_old_cart_bank = 0;
 	int m_old_cart_bank_was_read_only = 0;
 	int m_old_ram_bank = 0;
+	int m_old_floppy_bank = 0;
 	/* buffer storing demodulated bits, only for k7 and with speed hack */
 	uint32_t m_to7_k7_bitsize = 0;
 	uint8_t* m_to7_k7_bits = 0;
@@ -392,7 +393,7 @@ public:
 		m_to8_kbd(*this, "to8_kbd"),
 		m_to9_kbd(*this, "to9_kbd"),
 		m_wd2793(*this, "wd2793"),
-		m_floppy(*this, "wd2793:%u", 0U),
+		m_floppy(*this, "%u", 0U),
 		m_centronics(*this, "centronics"),
 		m_cent_data_out(*this, "cent_data_out"),
 		m_syslobank(*this, TO8_SYS_LO),
@@ -435,6 +436,7 @@ protected:
 	uint8_t  m_to8_soft_bank = 0;
 	uint8_t  m_to8_bios_bank = 0;
 
+	void to8_update_flop_bank_postload();
 	void to8_update_ram_bank_postload();
 	void to8_update_cart_bank_postload();
 	void to8_cartridge_w(offs_t offset, uint8_t data);
@@ -460,6 +462,7 @@ protected:
 	void to8_data_hi_w(offs_t offset, uint8_t data);
 	void to8_vcart_w(offs_t offset, uint8_t data);
 
+	void to8_update_flop_bank();
 	void to8_update_ram_bank();
 	void to8_update_cart_bank();
 
