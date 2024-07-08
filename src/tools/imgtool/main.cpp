@@ -33,6 +33,8 @@
 #include <fcntl.h>
 #endif
 
+//#define IMGTOOL_DEBUG 1
+
 // ----------------------------------------------------------------------
 
 static void writeusage(std::wostream &output, bool write_word_usage, const struct command *c, char *argv[])
@@ -51,7 +53,8 @@ static void writeusage(std::wostream &output, bool write_word_usage, const struc
 // ----------------------------------------------------------------------
 
 static int parse_options(int argc, char *argv[], int minunnamed, int maxunnamed,
-	util::option_resolution *resolution, imgtool::filter_getinfoproc *filter, const char **fork)
+	util::option_resolution *resolution, imgtool::filter_getinfoproc *filter,
+	const char **fork, const char **part, bool soft_fail)
 {
 	int i;
 	int lastunnamed = 0;
@@ -64,6 +67,21 @@ static int parse_options(int argc, char *argv[], int minunnamed, int maxunnamed,
 		*filter = nullptr;
 	if (fork)
 		*fork = nullptr;
+	if (part)
+		*part = nullptr;
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout,
+		L"parse_options: minunnamed=%d maxunnamed=%d\n", minunnamed, maxunnamed);
+	util::stream_format(std::wcout,
+		L"parse_options: filter %s - fork %s - part %s\n",
+		wstring_from_utf8(filter ? "set" : "unset"),
+		wstring_from_utf8(fork ? "set" : "unset"),
+		wstring_from_utf8(part ? "set" : "unset"));
+	util::stream_format(std::wcout, L"parse_options: argc=%d\n", argc);
+	for (i = 0; i < argc; i++)
+		util::stream_format(std::wcout,
+			L"parse_options: argv[%d]=\"%s\"\n", i, wstring_from_utf8(argv[i]));
+#endif // IMGTOOL_DEBUG
 
 	for (i = 0; i < argc; i++)
 	{
@@ -79,15 +97,18 @@ static int parse_options(int argc, char *argv[], int minunnamed, int maxunnamed,
 		{
 			/* Named */
 			name = argv[i] + 2;
-			s = strchr(name, '=');
+			snprintf(buf, std::size(buf), "%s", name);
+			s = strchr(buf, '=');
 			if (!s)
 				goto error;
 			*s = 0;
-			value = s + 1;
+			value = strchr(name, '=') + 1;
 
-			if (!strcmp(name, "filter"))
+			if (!strcmp(buf, "filter"))
 			{
 				/* filter option */
+				if (!filter && soft_fail)
+					continue;
 				if (!filter)
 					goto error; /* this command doesn't use filters */
 				if (*filter)
@@ -97,26 +118,52 @@ static int parse_options(int argc, char *argv[], int minunnamed, int maxunnamed,
 					goto filternotfound;
 
 			}
-			else if (!strcmp(name, "fork"))
+			else if (!strcmp(buf, "fork"))
 			{
 				/* fork option */
+				if (!fork && soft_fail)
+					continue;
 				if (!fork)
-					goto error; /* this command doesn't use filters */
+					goto error; /* this command doesn't use fork */
 				if (*fork)
 					goto optionalreadyspecified;
 
-				snprintf(buf, std::size(buf), "%s", value);
-				*fork = buf;
+				*fork = value;
+			}
+			else if (!strcmp(buf, "part"))
+			{
+				/* part option */
+				if (!part && soft_fail)
+					continue;
+				if (!part)
+					goto error; /* this command doesn't use part */
+				if (*part)
+					goto optionalreadyspecified;
+
+				*part = value;
 			}
 			else
 			{
 				/* Other named option */
 				if (i < minunnamed)
+				{
+#ifdef IMGTOOL_DEBUG
+					util::stream_format(std::wcout, L"parse_options: not OK, i (%d) < minunnamed (%d)\n", i, minunnamed);
+#endif // IMGTOOL_DEBUG
 					goto error; /* Too few unnamed */
+				}
 
-				util::option_resolution::entry *entry = resolution->find(name);
-				if (entry == nullptr)
+				if (!resolution && soft_fail)
+					continue;
+
+				util::option_resolution::entry *entry = resolution->find(buf);
+
+				if (!entry) {
+#ifdef IMGTOOL_DEBUG
+					util::stream_format(std::wcout, L"parse_options: not OK, unknown option\n", i);
+#endif // IMGTOOL_DEBUG
 					goto error; /* Unknown option */
+				}
 
 				if (entry->option_type() == util::option_guide::entry::option_type::ENUM_BEGIN)
 				{
@@ -137,18 +184,30 @@ static int parse_options(int argc, char *argv[], int minunnamed, int maxunnamed,
 			}
 		}
 	}
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"parse_options: OK, lastunnamed=%d\n", lastunnamed);
+#endif // IMGTOOL_DEBUG
 	return lastunnamed;
 
 filternotfound:
 	util::stream_format(std::wcerr, L"%s: Unknown filter type\n", wstring_from_utf8(value));
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"parse_options: not OK, filter=%s\n", wstring_from_utf8(value));
+#endif // IMGTOOL_DEBUG
 	return -1;
 
 optionalreadyspecified:
-	util::stream_format(std::wcerr, L"Cannot specify multiple %ss\n", wstring_from_utf8(name));
+	util::stream_format(std::wcerr, L"Cannot specify multiple %ss\n", wstring_from_utf8(buf));
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"parse_options: not OK, buf=%s\n", wstring_from_utf8(buf));
+#endif // IMGTOOL_DEBUG
 	return -1;
 
 error:
 	util::stream_format(std::wcerr, L"%s: Unrecognized option\n", wstring_from_utf8(argv[i]));
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"parse_options: not OK, argv[%d]=\"%s\"\n", i, wstring_from_utf8(argv[i]));
+#endif // IMGTOOL_DEBUG
 	return -1;
 }
 
@@ -215,6 +274,8 @@ static int cmd_dir(const struct command *c, int argc, char *argv[])
 	std::string path;
 	int partition_index = 0;
 	std::string info;
+	const char *part;
+	int unnamedargs;
 
 	// build the separator
 	const int columnwidth_filename = 30;
@@ -231,12 +292,24 @@ static int cmd_dir(const struct command *c, int argc, char *argv[])
 	if (err)
 		goto done;
 
+	unnamedargs = parse_options(argc, argv, 2, 3, nullptr, nullptr, nullptr, &part, false);
+	if (unnamedargs < 0)
+		goto done;
+	if (part)
+		partition_index = atoi(part);
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"cmd_dir(): partition_index=%d\n", partition_index);
+#endif // IMGTOOL_DEBUG
+
 	/* attempt to open partition */
 	err = imgtool::partition::open(*image, partition_index, partition);
 	if (err)
 		goto done;
 
-	path = argc > 2 ? argv[2] : "";
+	path = (unnamedargs == 3) ? argv[2] : "";
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"cmd_dir(): path=\"%s\"\n", wstring_from_utf8(path));
+#endif // IMGTOOL_DEBUG
 
 	err = imgtool::directory::open(*partition, path, imgenum);
 	if (err)
@@ -319,10 +392,20 @@ static int cmd_get(const struct command *c, int argc, char *argv[])
 	imgtool::filter_getinfoproc filter;
 	const char *fork;
 	int partition_index = 0;
+	const char *part;
 
 	err = imgtool::image::open(argv[0], argv[1], OSD_FOPEN_READ, image);
 	if (err)
 		goto done;
+
+	unnamedargs = parse_options(argc, argv, 3, 4, nullptr, &filter, &fork, &part, false);
+	if (unnamedargs < 0)
+		goto done;
+	if (part)
+		partition_index = atoi(part);
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"cmd_get(): partition_index=%d\n", partition_index);
+#endif // IMGTOOL_DEBUG
 
 	err = imgtool::partition::open(*image, partition_index, partition);
 	if (err)
@@ -330,11 +413,11 @@ static int cmd_get(const struct command *c, int argc, char *argv[])
 
 	filename = interpret_filename(argv[2]);
 
-	unnamedargs = parse_options(argc, argv, 3, 4, nullptr, &filter, &fork);
-	if (unnamedargs < 0)
-		goto done;
-
 	new_filename = (unnamedargs == 4) ? argv[3] : nullptr;
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"cmd_get(): filename=\"%s\"\n", wstring_from_utf8(filename));
+	util::stream_format(std::wcout, L"cmd_get(): new_filename=\"%s\"\n", wstring_from_utf8(new_filename));
+#endif // IMGTOOL_DEBUG
 
 	err = partition->get_file(filename, fork, new_filename, filter);
 	if (err)
@@ -367,6 +450,7 @@ static int cmd_put(const struct command *c, int argc, char *argv[])
 	int partition_index = 0;
 	const util::option_guide *writefile_optguide;
 	const char *writefile_optspec;
+	const char *part;
 
 	module = imgtool_find_module(argv[0]);
 	if (!module)
@@ -374,6 +458,15 @@ static int cmd_put(const struct command *c, int argc, char *argv[])
 		err = (imgtoolerr_t)(IMGTOOLERR_MODULENOTFOUND | IMGTOOLERR_SRC_MODULE);
 		goto done;
 	}
+
+	unnamedargs = parse_options(argc, argv, 3, 0xffff, nullptr, nullptr, nullptr, &part, true);
+	if (unnamedargs < 0)
+		goto done;
+	if (part)
+		partition_index = atoi(part);
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"cmd_put(): partition_index=%d\n", partition_index);
+#endif // IMGTOOL_DEBUG
 
 	/* ugh I hate the way this function is set up, this is because the
 	 * arguments depend on the partition; something that requires some
@@ -405,7 +498,7 @@ static int cmd_put(const struct command *c, int argc, char *argv[])
 		}
 	}
 
-	unnamedargs = parse_options(argc, argv, 4, 0xffff, resolution.get(), &filter, &fork);
+	unnamedargs = parse_options(argc, argv, 3, 0xffff, resolution.get(), &filter, &fork, &part, false);
 	if (unnamedargs < 0)
 		return -1;
 
@@ -413,11 +506,17 @@ static int cmd_put(const struct command *c, int argc, char *argv[])
 	new_filename = interpret_filename(argv[unnamedargs - 1]);
 	filename_list = &argv[2];
 	filename_count = unnamedargs - 3;
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"cmd_put(): new_filename=\"%s\"\n", wstring_from_utf8(new_filename));
+#endif // IMGTOOL_DEBUG
 
 	/* loop through the filenames, and put them */
 	for (int i = 0; i < filename_count; i++)
 	{
 		filename = filename_list[i];
+#ifdef IMGTOOL_DEBUG
+		util::stream_format(std::wcout, L"cmd_put(): filename=\"%s\"\n", wstring_from_utf8(filename));
+#endif // IMGTOOL_DEBUG
 		util::stream_format(std::wcout, L"Putting file '%s'...\n", wstring_from_utf8(filename));
 		err = partition->put_file(new_filename, fork, filename, resolution.get(), filter);
 		if (err)
@@ -444,10 +543,20 @@ static int cmd_getall(const struct command *c, int argc, char *argv[])
 	const char *path = "";
 	int arg;
 	int partition_index = 0;
+	const char *part;
 
 	err = imgtool::image::open(argv[0], argv[1], OSD_FOPEN_READ, image);
 	if (err)
 		goto done;
+
+	unnamedargs = parse_options(argc, argv, 2, 3, nullptr, &filter, nullptr, &part, false);
+	if (unnamedargs < 0)
+		goto done;
+	if (part)
+		partition_index = atoi(part);
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"cmd_getall(): partition_index=%d\n", partition_index);
+#endif // IMGTOOL_DEBUG
 
 	err = imgtool::partition::open(*image, partition_index, partition);
 	if (err)
@@ -458,10 +567,9 @@ static int cmd_getall(const struct command *c, int argc, char *argv[])
 	{
 		path = argv[arg++];
 	}
-
-	unnamedargs = parse_options(argc, argv, arg, arg, nullptr, &filter, nullptr);
-	if (unnamedargs < 0)
-		goto done;
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"cmd_getall(): path=\"%s\"\n", wstring_from_utf8(path));
+#endif // IMGTOOL_DEBUG
 
 	err = imgtool::directory::open(*partition, path, imgenum);
 	if (err)
@@ -490,18 +598,40 @@ static int cmd_del(const struct command *c, int argc, char *argv[])
 	imgtool::image::ptr image;
 	imgtool::partition::ptr partition;
 	int partition_index = 0;
+	const char *part;
+	int unnamedargs;
+	const char *filename;
+	int i;
 
 	err = imgtool::image::open(argv[0], argv[1], OSD_FOPEN_RW, image);
 	if (err)
 		goto done;
 
+	unnamedargs = parse_options(argc, argv, 3, 0xffff, nullptr, nullptr, nullptr, &part, false);
+	if (unnamedargs < 0)
+		goto done;
+	if (part)
+		partition_index = atoi(part);
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"cmd_del(): partition_index=%d\n", partition_index);
+#endif // IMGTOOL_DEBUG
+
 	err = imgtool::partition::open(*image, partition_index, partition);
 	if (err)
 		goto done;
 
-	err = partition->delete_file(argv[2]);
-	if (err)
-		goto done;
+
+	/* loop through the filenames, and put them */
+	for (i = 2; i < unnamedargs ; i++)
+	{
+		filename = argv[i];
+#ifdef IMGTOOL_DEBUG
+		util::stream_format(std::wcout, L"cmd_del(): filename=\"%s\"\n", wstring_from_utf8(filename));
+#endif // IMGTOOL_DEBUG
+		err = partition->delete_file(filename);
+		if (err)
+			goto done;
+	}
 
 done:
 	if (err)
@@ -517,16 +647,33 @@ static int cmd_mkdir(const struct command *c, int argc, char *argv[])
 	imgtool::image::ptr image;
 	imgtool::partition::ptr partition;
 	int partition_index = 0;
+	const char *part;
+	const char *directory;
+	int unnamedargs;
 
 	err = imgtool::image::open(argv[0], argv[1], OSD_FOPEN_RW, image);
 	if (err)
 		goto done;
 
+	unnamedargs = parse_options(argc, argv, 3, 3, nullptr, nullptr, nullptr, &part, false);
+	if (unnamedargs < 0)
+		goto done;
+	if (part)
+		partition_index = atoi(part);
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"cmd_mkdir(): partition_index=%d\n", partition_index);
+#endif // IMGTOOL_DEBUG
+
 	err = imgtool::partition::open(*image, partition_index, partition);
 	if (err)
 		goto done;
 
-	err = partition->create_directory(argv[2]);
+	directory = (unnamedargs == 3) ? argv[2] : nullptr;
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"cmd_mkdir(): directory=\"%s\"\n", wstring_from_utf8(directory));
+#endif // IMGTOOL_DEBUG
+
+	err = partition->create_directory(directory);
 	if (err)
 		goto done;
 
@@ -544,18 +691,39 @@ static int cmd_rmdir(const struct command *c, int argc, char *argv[])
 	imgtool::image::ptr image;
 	imgtool::partition::ptr partition;
 	int partition_index = 0;
+	const char *part;
+	int unnamedargs;
+	const char *directory;
+	int i;
 
 	err = imgtool::image::open(argv[0], argv[1], OSD_FOPEN_RW, image);
 	if (err)
 		goto done;
 
+	unnamedargs = parse_options(argc, argv, 3, 0xffff, nullptr, nullptr, nullptr, &part, false);
+	if (unnamedargs < 0)
+		goto done;
+	if (part)
+		partition_index = atoi(part);
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"cmd_rmdir(): partition_index=%d\n", partition_index);
+#endif // IMGTOOL_DEBUG
+
 	err = imgtool::partition::open(*image, partition_index, partition);
 	if (err)
 		goto done;
 
-	err = partition->delete_directory(argv[2]);
-	if (err)
-		goto done;
+	/* loop through the filenames, and put them */
+	for (i = 2; i < unnamedargs ; i++)
+	{
+		directory = argv[i];
+#ifdef IMGTOOL_DEBUG
+		util::stream_format(std::wcout, L"cmd_rmdir(): directory=\"%s\"\n", wstring_from_utf8(directory));
+#endif // IMGTOOL_DEBUG
+		err = partition->delete_directory(directory);
+		if (err)
+			goto done;
+	}
 
 done:
 	if (err)
@@ -615,7 +783,7 @@ static int cmd_create(const struct command *c, int argc, char *argv[])
 		resolution->set_specification(module->createimage_optspec.c_str());
 	}
 
-	unnamedargs = parse_options(argc, argv, 2, 3, resolution.get(), nullptr, nullptr);
+	unnamedargs = parse_options(argc, argv, 2, 2, resolution.get(), nullptr, nullptr, nullptr, false);
 	if (unnamedargs < 0)
 		return -1;
 
@@ -856,13 +1024,13 @@ static int cmd_listdriveroptions(const struct command *c, int argc, char *argv[]
 static const struct command cmds[] =
 {
 	{ "create",             cmd_create,             "<format> <imagename> [--(createoption)=value]", 2, 8, 0},
-	{ "dir",                cmd_dir,                "<format> <imagename> [path]", 2, 3, 0 },
-	{ "get",                cmd_get,                "<format> <imagename> <filename> [newname] [--filter=filter] [--fork=fork]", 3, 6, 0 },
-	{ "put",                cmd_put,                "<format> <imagename> <filename>... <destname> [--(fileoption)==value] [--filter=filter] [--fork=fork]", 3, 0xffff, 0 },
-	{ "getall",             cmd_getall,             "<format> <imagename> [path] [--filter=filter]", 2, 3, 0 },
-	{ "del",                cmd_del,                "<format> <imagename> <filename>...", 3, 3, 1 },
-	{ "mkdir",              cmd_mkdir,              "<format> <imagename> <dirname>", 3, 3, 0 },
-	{ "rmdir",              cmd_rmdir,              "<format> <imagename> <dirname>...", 3, 3, 1 },
+	{ "dir",                cmd_dir,                "<format> <imagename> [path] [--part=part]", 2, 4, 0 },
+	{ "get",                cmd_get,                "<format> <imagename> <filename> [newname] [--filter=filter] [--fork=fork] [--part=part]", 3, 7, 0 },
+	{ "put",                cmd_put,                "<format> <imagename> <filename>... <destname> [--(fileoption)==value] [--filter=filter] [--fork=fork] [--part=part]", 4, 0xffff, 0 },
+	{ "getall",             cmd_getall,             "<format> <imagename> [path] [--filter=filter] [--part=part]", 2, 5, 0 },
+	{ "del",                cmd_del,                "<format> <imagename> <filename>... [--part=part]", 3, 0xffff, 0 },
+	{ "mkdir",              cmd_mkdir,              "<format> <imagename> <dirname> [--part=part]", 3, 4, 0 },
+	{ "rmdir",              cmd_rmdir,              "<format> <imagename> <dirname>... [--part=part]", 3, 0xffff, 0 },
 	{ "readsector",         cmd_readsector,         "<format> <imagename> <track> <head> <sector> <filename>", 6, 6, 0 },
 	{ "writesector",        cmd_writesector,        "<format> <imagename> <track> <head> <sector> <filename>", 6, 6, 0 },
 	{ "identify",           cmd_identify,           "<imagename>", 1, 1 },
@@ -908,8 +1076,18 @@ int main(int argc, char *argv[])
 			if (!core_stricmp(c->name, argv[1]))
 			{
 				/* check argument count */
+#ifdef IMGTOOL_DEBUG
+				util::stream_format(std::wcout,
+					L"main: c->minargs=%d, c->maxargs=%d, c->lastargrepeats=%d, argc=%d\n",
+					c->minargs, c->maxargs, c->lastargrepeats, argc);
+#endif // IMGTOOL_DEBUG
 				if (c->minargs > (argc - 2))
+				{
+#ifdef IMGTOOL_DEBUG
+					util::stream_format(std::wcout, L"main: minargs > (argc - 2)\n");
+#endif // IMGTOOL_DEBUG
 					goto cmderror;
+				}
 
 				/* initialize the imgtool core */
 				imgtool_init(true, nullptr);
@@ -930,7 +1108,12 @@ int main(int argc, char *argv[])
 				else
 				{
 					if ((c->maxargs > 0) && (c->maxargs < (argc - 2)))
+					{
+#ifdef IMGTOOL_DEBUG
+						util::stream_format(std::wcout, L"main: (c->maxargs > 0) && (c->maxargs < (argc - 2))\n");
+#endif // IMGTOOL_DEBUG
 						goto cmderror;
+					}
 
 					result = c->cmdproc(c, argc - 2, argv + 2);
 					goto done;
