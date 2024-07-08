@@ -1234,6 +1234,7 @@ static void wd2793_formats(format_registration &fr)
 
 static void wd2793_drives(device_slot_interface &device)
 {
+	device.option_add("35ssdd", FLOPPY_35_SSDD);
 	device.option_add("35dd", FLOPPY_35_DD);
 }
 
@@ -1263,9 +1264,8 @@ void to9_state::to9(machine_config &config)
 
 	/* floppy */
 	WD2793(config, m_wd2793, 16_MHz_XTAL / 16);
-	FLOPPY_CONNECTOR(config, m_floppy[0], wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[0], wd2793_drives, "35ssdd", wd2793_formats).enable_sound(true);
 	FLOPPY_CONNECTOR(config, m_floppy[1], wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, m_floppy[2], wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
 }
 
 

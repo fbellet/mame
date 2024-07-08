@@ -2197,7 +2197,7 @@ void to9_state::wd2793_control_w(u8 data)
 	/* Internal floppy drive is single sided only */
 	case 3: drive = 0; side = 1; floppy = nullptr; break;
 	case 4: drive = 1; side = 0; floppy = m_floppy[1]->get_device(); break;
-	case 5: drive = 1; side = 1; floppy = m_floppy[2]->get_device(); break;
+	case 5: drive = 1; side = 1; floppy = m_floppy[1]->get_device(); break;
 	default:
 		LOGMASKED(LOG_ERRORS, "%f $%04x wd2793_control_w: invalid drive select pattern $%02X\n",
 			machine().time().as_double(), m_maincpu->pc(), data);
@@ -2205,7 +2205,7 @@ void to9_state::wd2793_control_w(u8 data)
 	if(floppy)
 	{
 		floppy->mon_w(0);
-		floppy->ss_w(0);
+		floppy->ss_w(side);
 	}
 	m_wd2793->set_floppy(floppy);
 	m_wd2793->dden_w(BIT(data, 7));
