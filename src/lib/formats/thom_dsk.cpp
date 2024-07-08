@@ -22,6 +22,11 @@ const char *thomson_525_format::extensions() const noexcept
 	return "fd";
 }
 
+int thomson_525_format::get_image_offset(const format &f, int head, int track) const
+{
+        return (f.track_count * head + track) * compute_track_size(f);
+}
+
 const thomson_525_format::format thomson_525_format::formats[] = {
 	{
 		floppy_image::FF_525, floppy_image::SSSD, floppy_image::FM,
@@ -68,6 +73,11 @@ const char *thomson_35_format::description() const noexcept
 const char *thomson_35_format::extensions() const noexcept
 {
 	return "fd";
+}
+
+int thomson_35_format::get_image_offset(const format &f, int head, int track) const
+{
+        return (f.track_count * head + track) * compute_track_size(f);
 }
 
 const thomson_35_format::format thomson_35_format::formats[] = {

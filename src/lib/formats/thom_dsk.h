@@ -18,6 +18,7 @@ public:
 
 private:
   static const format formats[];
+  virtual int get_image_offset(const format &f, int head, int track) const override;
 };
 
 class thomson_35_format : public wd177x_format
@@ -31,6 +32,7 @@ public:
 
 private:
   static const format formats[];
+  virtual int get_image_offset(const format &f, int head, int track) const override;
 };
 
 
