@@ -443,7 +443,7 @@ static uint8_t* thom_get_sector(thom_floppy* f, unsigned head,
 	assert( head < f->heads);
 	assert( track < f->tracks );
 	assert( sector > 0 && sector <= 16 );
-	return & f->data[ ( (head * f->tracks + track) * 16 + (sector-1) ) *
+	return & f->data[ ( (track * f->heads + head) * 16 + (sector-1) ) *
 			f->sector_size ];
 }
 
