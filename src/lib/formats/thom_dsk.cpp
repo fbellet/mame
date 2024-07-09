@@ -103,5 +103,16 @@ int thomson_35_format::get_image_offset(const format &f, int head, int track) co
 	return (track + (head ? f.track_count : 0)) * compute_track_size(f);
 }
 
+floppy_image_format_t::desc_e* thomson_35_format::get_desc_mfm(const format &f, int &current_size, int &end_gap_index) const
+{
+	floppy_image_format_t::desc_e *desc = wd177x_format::get_desc_mfm(f, current_size, end_gap_index);
+
+	// The format description differs from the wd177x format:
+	// the head id is always zero (in field 7)
+	desc[7] = { MFM, 0x00, 1 };
+
+	return desc;
+}
+
 const thomson_525_format FLOPPY_THOMSON_525_FORMAT;
 const thomson_35_format FLOPPY_THOMSON_35_FORMAT;
