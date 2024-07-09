@@ -142,51 +142,50 @@ void thmfc1_device::cmd0_w(u8 data)
 			 m_cmd0 & C0_WGC ? 1 : 0,
 			 mode[m_cmd0 & 3]);
 
-	if(m_stat0 & S0_FREE) {
-		switch(m_cmd0 & 3) {
-		case 0:
-			if(m_cmd0 & C0_WGC) {
-				LOGCOMMAND("format start h=%d t=%d sz=%d\n",
-						 m_cmd1 & C1_SIDE ? 1 : 0,
-						 m_trck,
-						 128 << ((m_cmd1 >> 5) & 3));
-				m_state = S_FORMAT;
-				m_use_shift_clk_reg = (m_clk == 0x0a);
-				m_window_start = m_last_sync;
-				m_write_buffer_idx = 0;
-			} else
-				m_state = S_IDLE;
-			break;
-		case 1:
-			LOGCOMMAND("write_sector start h=%d t=%d s=%d sz=%d\n",
+	switch(m_cmd0 & 3) {
+	case 0:
+		if(m_cmd0 & C0_WGC) {
+			LOGCOMMAND("format start h=%d t=%d sz=%d\n",
 					 m_cmd1 & C1_SIDE ? 1 : 0,
 					 m_trck,
-					 m_sect,
 					 128 << ((m_cmd1 >> 5) & 3));
-			m_state = S_READ_WAIT_HEADER_SYNC;
-			LOGSTATE("read_wait_header_sync start\n");
-			if(m_stat0 & S0_FREE)
-				LOGSTAT0("free unset in stat0\n");
-			m_stat0 &= ~S0_FREE;
+			m_state = S_FORMAT;
+			m_use_shift_clk_reg = (m_clk == 0x0a);
 			m_window_start = m_last_sync;
-			break;
-		case 2:
-			LOGCOMMAND("rhead\n");
-			exit(0);
-		case 3:
-			LOGCOMMAND("read_sector start h=%d t=%d s=%d sz=%d\n",
-					 m_cmd1 & C1_SIDE ? 1 : 0,
-					 m_trck,
-					 m_sect,
-					 128 << ((m_cmd1 >> 5) & 3));
-			m_state = S_READ_WAIT_HEADER_SYNC;
-			LOGSTATE("read_wait_header_sync start\n");
-			if(m_stat0 & S0_FREE)
-				LOGSTAT0("free unset in stat0\n");
-			m_stat0 &= ~S0_FREE;
-			m_window_start = m_last_sync;
-			break;
-		}
+			m_write_buffer_idx = 0;
+		} else
+			m_state = S_IDLE;
+		m_stat0 |= S0_FREE;
+		break;
+	case 1:
+		LOGCOMMAND("write_sector start h=%d t=%d s=%d sz=%d\n",
+				 m_cmd1 & C1_SIDE ? 1 : 0,
+				 m_trck,
+				 m_sect,
+				 128 << ((m_cmd1 >> 5) & 3));
+		m_state = S_READ_WAIT_HEADER_SYNC;
+		LOGSTATE("read_wait_header_sync start\n");
+		if(m_stat0 & S0_FREE)
+			LOGSTAT0("free unset in stat0\n");
+		m_stat0 &= ~S0_FREE;
+		m_window_start = m_last_sync;
+		break;
+	case 2:
+		LOGCOMMAND("rhead\n");
+		exit(0);
+	case 3:
+		LOGCOMMAND("read_sector start h=%d t=%d s=%d sz=%d\n",
+				 m_cmd1 & C1_SIDE ? 1 : 0,
+				 m_trck,
+				 m_sect,
+				 128 << ((m_cmd1 >> 5) & 3));
+		m_state = S_READ_WAIT_HEADER_SYNC;
+		LOGSTATE("read_wait_header_sync start\n");
+		if(m_stat0 & S0_FREE)
+			LOGSTAT0("free unset in stat0\n");
+		m_stat0 &= ~S0_FREE;
+		m_window_start = m_last_sync;
+		break;
 	}
 }
 
@@ -385,7 +384,7 @@ bool thmfc1_device::read_one_bit(u64 limit, u64 &next_flux_change)
 		else
 			m_crc = m_crc << 1;
 	}
-	if(m_data_reg == m_data && clk_bits() == m_clk) {
+	if(m_data_reg == m_data && clk_bits() == m_clk && m_cmd0 & C0_ENSYN) {
 		if(~m_stat0 & S0_SYNC)
 			LOGSTAT0("sync set in stat0 (data=0x%02x clk=0x%02x)\n", m_data, m_clk);
 		m_stat0 |= S0_SYNC;
@@ -521,21 +520,21 @@ void thmfc1_device::sync()
 				break;
 			case 4:
 				valid = m_data_reg == m_trck;
-				LOGSTATE("read_verify_header data_reg=0x%02x trck=0x%x\n", m_data_reg, m_trck);
+				LOGSTATE("read_verify_header data_reg=0x%02x trck=0x%02x\n", m_data_reg, m_trck);
 				break;
 			case 5:
 				// The THMFC1 BIOS always sets side to zero in the sector header.
                                 // This is a difference wrt to wd177x MFM/MF track format description
 				valid = (m_data_reg & 1) == (m_cmd1 & C1_SIDE ? 1 : 0);
-				LOGSTATE("read_verify_header data_reg=0x%02x side=0x%x\n", m_data_reg, m_cmd1 & C1_SIDE ? 1 : 0);
+				LOGSTATE("read_verify_header data_reg=0x%02x side=0x%02x\n", m_data_reg, m_cmd1 & C1_SIDE ? 1 : 0);
 				break;
 			case 6:
 				valid = m_data_reg == m_sect;
-				LOGSTATE("read_verify_header data_reg=0x%02x sect=0x%x\n", m_data_reg, m_sect);
+				LOGSTATE("read_verify_header data_reg=0x%02x sect=0x%02x\n", m_data_reg, m_sect);
 				break;
 			case 7:
 				valid = (m_data_reg & 3) == ((m_cmd1 >> 5) & 3);
-				LOGSTATE("read_verify_header data_reg=0x%02x len=0x%x\n", m_data_reg, (m_cmd1 >> 5) & 3);
+				LOGSTATE("read_verify_header data_reg=0x%02x len=0x%02x\n", m_data_reg, (m_cmd1 >> 5) & 3);
 				break;
 				// 8 skipped
 			case 9:
