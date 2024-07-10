@@ -78,19 +78,19 @@ private:
 	u64 m_last_sync, m_window_start;
 	int m_state;
 
-	u16 m_shift_reg, m_crc, m_bit_counter;
+	u16 m_shift_reg, m_crc;
+	u8 m_bit_counter;
+	u16 m_byte_counter;
 	u8 m_shift_data_reg, m_shift_clk_reg;
-	u8 m_data_reg;
 	u8 m_bit;
 
 	u8 m_cmd0, m_cmd1, m_cmd2, m_stat0;
-	u8 m_data, m_clk, m_sect, m_trck, m_cell;
+	u8 m_rdata, m_wdata, m_clk, m_sect, m_trck, m_cell;
 	u16 m_sect_size;
 
-	bool m_data_separator_phase;
 	bool m_use_shift_clk_reg;
 
-	attotime m_write_buffer[32];
+	attotime m_write_buffer[128];
 	u64 m_write_buffer_start;
 	int m_write_buffer_idx;
 
@@ -115,6 +115,7 @@ private:
 	void sync();
 	bool read_one_bit(u64 limit, u64 &next_flux_change);
 	bool write_one_bit(u64 limit);
+	void flush_flux();
 };
 
 DECLARE_DEVICE_TYPE(THMFC1, thmfc1_device)
