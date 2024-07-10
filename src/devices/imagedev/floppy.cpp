@@ -470,6 +470,8 @@ uint32_t floppy_image_device::get_sectoring_type()
 void floppy_image_device::setup_write(const floppy_image_format_t *_output_format)
 {
 	m_output_format = _output_format;
+	if(m_output_format == nullptr)
+		m_wpt = 1;
 	if(m_image)
 		commit_image();
 }
