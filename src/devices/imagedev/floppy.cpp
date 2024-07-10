@@ -388,6 +388,8 @@ void floppy_image_device::set_rpm(float _rpm)
 void floppy_image_device::setup_write(const floppy_image_format_t *_output_format)
 {
 	m_output_format = _output_format;
+	if(m_output_format == nullptr)
+		m_wpt = 1;
 	if(m_image)
 		commit_image();
 }
