@@ -896,7 +896,7 @@ attotime floppy_image_device::time_next_index()
 	return m_revolution_start_time + m_rev_time;
 }
 
-/* index pulses at m_rpm/60 Hz, and stays high for ~2ms at 300rpm */
+/* index pulses at m_rpm/60 Hz, and stays high for ~1ms at 300rpm */
 TIMER_CALLBACK_MEMBER(floppy_image_device::index_resync)
 {
 	if(m_revolution_start_time.is_never()) {
@@ -916,10 +916,10 @@ TIMER_CALLBACK_MEMBER(floppy_image_device::index_resync)
 	}
 	int position = int(delta.as_double()*m_angular_speed + 0.5);
 
-	int new_idx = position < 2000000;
+	int new_idx = position < 1000000;
 
 	if(new_idx) {
-		attotime index_up_time = attotime::from_double(2000000/m_angular_speed);
+		attotime index_up_time = attotime::from_double(1000000/m_angular_speed);
 		m_index_timer->adjust(index_up_time - delta);
 	} else
 		m_index_timer->adjust(m_rev_time - delta);
