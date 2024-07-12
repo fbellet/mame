@@ -13,6 +13,7 @@
 #include "imageutl.h"
 #include "ioprocs.h"
 #include "multibyte.h"
+#include "osdcore.h"
 #include "strformat.h"
 
 #include <algorithm>
@@ -22,6 +23,16 @@
 #include <stdexcept>
 #include <utility>
 
+#define LOG_OUTPUT_FUNC osd_printf_info
+
+#define LOG_BITSTREAM	(1U << 1)   // Bitstream
+
+// #define VERBOSE (LOG_BITSTREAM)
+
+#define __EMU_H__ // logmacro wasn't really intended to be used outside stuff that uses libemu
+#include "../emu/logmacro.h"
+
+#define LOGBITSTREAM(...)        LOGMASKED(LOG_BITSTREAM, __VA_ARGS__)
 
 floppy_image::floppy_image(int _tracks, int _heads, uint32_t _form_factor)
 {
@@ -1624,7 +1635,7 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 		if(shift_reg == 0x4489) {
 			uint16_t header;
 			uint32_t pos = i+1;
-			LOG_FORMATS("0x4489 at pos %d\n", i);
+			LOGBITSTREAM("0x4489 at pos %d\n", i);
 			do {
 				header = 0;
 				for(int j=0; j<16; j++)
@@ -1635,12 +1646,12 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 				// Wrapping ones have already been take into account
 				// thanks to the precharging
 			} while(header == 0x4489 && pos > i);
-			LOG_FORMATS("0x%04x at pos %d\n", header, pos);
+			LOGBITSTREAM("0x%04x at pos %d\n", header, pos);
 
 			// fe, ff
 			if(header == 0x5554 || header == 0x5555) {
 				if(idblk_count < 100) {
-					LOG_FORMATS("idblk[%d] at pos %d\n", idblk_count, pos);
+					LOGBITSTREAM("idblk[%d] at pos %d\n", idblk_count, pos);
 					idblk[idblk_count++] = pos;
 				}
 				i = pos-1;
@@ -1648,7 +1659,7 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 			// f8, f9, fa, fb
 			if(header == 0x554a || header == 0x5549 || header == 0x5544 || header == 0x5545) {
 				if(dblk_count < 100) {
-					LOG_FORMATS("dblk[%d] at pos %d\n", dblk_count, pos);
+					LOGBITSTREAM("dblk[%d] at pos %d\n", dblk_count, pos);
 					dblk[dblk_count++] = pos;
 				}
 				i = pos-1;
@@ -1663,8 +1674,8 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 		[[maybe_unused]] uint8_t head = sbyte_mfm_r(bitstream, pos);
 		uint8_t sector = sbyte_mfm_r(bitstream, pos);
 		uint8_t size = sbyte_mfm_r(bitstream, pos);
-		LOG_FORMATS("i=%d track=%d head=%d sector=%d size=%d at pos %d\n",
-				i, track, head, sector, size, idblk[i]);
+		LOGBITSTREAM("i=%d h=%d t=%d s=%d sz=%d at pos %d\n",
+				i, head, track, sector, size, idblk[i]);
 
 		if(size >= 8)
 			continue;
@@ -1684,7 +1695,7 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 		if(d_index == dblk_count)
 			continue;
 
-		LOG_FORMATS("using dblk[%d] at pos %d\n", d_index, dblk[d_index]);
+		LOGBITSTREAM("using dblk[%d] at pos %d\n", d_index, dblk[d_index]);
 		pos = dblk[d_index];
 
 		if(sectors.size() <= sector)
@@ -1723,7 +1734,7 @@ void floppy_image_format_t::get_geometry_mfm_pc(const floppy_image &image, int c
 void floppy_image_format_t::get_track_data_mfm_pc(int track, int head, const floppy_image &image, int cell_size, int sector_size, int sector_count, uint8_t *sectdata)
 {
 	auto bitstream = generate_bitstream_from_track(track, head, cell_size, image);
-	LOG_FORMATS("head=%d track=%d sector_count=%d\n", head, track, sector_count);
+	LOGBITSTREAM("head=%d track=%d sector_count=%d\n", head, track, sector_count);
 	auto sectors = extract_sectors_from_bitstream_mfm_pc(bitstream);
 	for(int sector=1; sector <= sector_count; sector++) {
 		uint8_t *sd = sectdata + (sector-1)*sector_size;
