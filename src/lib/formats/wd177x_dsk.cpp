@@ -16,6 +16,16 @@
 
 #include <cstring>
 
+#define LOG_OUTPUT_FUNC osd_printf_info
+
+#define LOG_BITSTREAM	(1U << 1)   // Bitstream
+
+// #define VERBOSE (LOG_BITSTREAM)
+
+#define __EMU_H__ // logmacro wasn't really intended to be used outside stuff that uses libemu
+#include "../emu/logmacro.h"
+
+#define LOGBITSTREAM(...)        LOGMASKED(LOG_BITSTREAM, __VA_ARGS__)
 
 wd177x_format::wd177x_format(const format *_formats)
 {
@@ -511,9 +521,11 @@ void wd177x_format::extract_sectors(const floppy_image &image, const format &f, 
 	switch (f.encoding)
 	{
 	case floppy_image::FM:
+		LOGBITSTREAM("extract_sectors h=%d t=%d mode=FM\n", head, track);
 		sectors = extract_sectors_from_bitstream_fm_pc(bitstream);
 		break;
 	case floppy_image::MFM:
+		LOGBITSTREAM("extract_sectors h=%d t=%d mode=MFM\n", head, track);
 		sectors = extract_sectors_from_bitstream_mfm_pc(bitstream);
 		break;
 	}
