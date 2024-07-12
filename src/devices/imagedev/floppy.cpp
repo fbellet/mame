@@ -810,7 +810,7 @@ attotime floppy_image_device::time_next_index()
 	return m_revolution_start_time + m_rev_time;
 }
 
-/* index pulses at m_rpm/60 Hz, and stays high for ~2ms at 300rpm */
+/* index pulses at m_rpm/60 Hz, and stays high for ~1ms at 300rpm */
 TIMER_CALLBACK_MEMBER(floppy_image_device::index_resync)
 {
 	if(m_revolution_start_time.is_never()) {
@@ -834,10 +834,10 @@ TIMER_CALLBACK_MEMBER(floppy_image_device::index_resync)
 	// if hard-sectored floppy, has extra IDX pulses
 	if(m_image)
 		m_image->find_index_hole(position, last_index, next_index);
-	int new_idx = position - last_index < 2000000;
+	int new_idx = position - last_index < 1000000;
 
 	if(new_idx) {
-		uint32_t index_up = last_index + 2000000;
+		uint32_t index_up = last_index + 1000000;
 		attotime index_up_time = attotime::from_double(index_up/m_angular_speed);
 		m_index_timer->adjust(index_up_time - delta);
 	} else {
