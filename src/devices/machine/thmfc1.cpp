@@ -9,7 +9,7 @@
 // - Emulation of FREE stat0 bit should be tested with real hardware:
 //   FREE is not set when the controller received a RESET cmd after an
 //   interrupted RSECT cmd (tested with analpiste_to8).
-// - Motor on/off control has issues
+// - FM coding is implemented, but unused with real hardware.
 
 #include "emu.h"
 #include "thmfc1.h"
@@ -22,7 +22,6 @@ DEFINE_DEVICE_TYPE(THMFC1, thmfc1_device, "thmfc1", "SGS-Thomson THM-FC-1 Disket
 #define LOG_REGS         (1U << 4) // Show register access
 #define LOG_COMMAND      (1U << 5) // Show command invocation
 #define LOG_STAT0        (1U << 6) // Show stat0 register updates
-#define LOG_CRC          (1U << 7) // Show crc data
 
 // #define VERBOSE (LOG_COMMAND)
 
@@ -34,7 +33,6 @@ DEFINE_DEVICE_TYPE(THMFC1, thmfc1_device, "thmfc1", "SGS-Thomson THM-FC-1 Disket
 #define LOGREGS(...)        LOGMASKED(LOG_REGS, __VA_ARGS__)
 #define LOGCOMMAND(...)     LOGMASKED(LOG_COMMAND, __VA_ARGS__)
 #define LOGSTAT0(...)       LOGMASKED(LOG_STAT0, __VA_ARGS__)
-#define LOGCRC(...)         LOGMASKED(LOG_CRC, __VA_ARGS__)
 
 #ifdef _MSC_VER
 #define FUNCNAME __func__
@@ -152,24 +150,24 @@ void thmfc1_device::cmd0_w(u8 data)
 		if((m_cell & 0x7f) == 0)
 			m_state = S_IDLE;
 		else if(m_cmd0 & C0_WGC) {
-			LOGCOMMAND("format start h=%d t=%d sz=%d\n",
+			LOGCOMMAND("command format h=%d t=%d\n",
 					 m_cmd1 & C1_SIDE ? 1 : 0,
-					 m_trck,
-					 128 << ((m_cmd1 >> 5) & 3));
+					 m_trck);
 			m_state = S_FORMAT;
 			m_bit_counter = 0;
 			m_byte_counter = 0;
 			m_use_shift_clk_reg = (m_clk == 0x0a);
 			m_window_start = m_last_sync;
-			LOGSTATE("format start\n");
+			LOGSTATE("s_format start\n");
 		} else {
 			flush_flux();
 			m_state = S_READ_WAIT_HEADER_SYNC;
-			LOGSTATE("read_wait_header_sync start\n");
+			LOGSTATE("s_read_wait_header_sync start\n");
 		}
 		break;
-	case 1:
-		LOGCOMMAND("write_sector start h=%d t=%d s=%d sz=%d\n",
+	default:
+		LOGCOMMAND("command %s h=%d t=%d s=%d sz=%d\n",
+				 mode[m_cmd0 & 3],
 				 m_cmd1 & C1_SIDE ? 1 : 0,
 				 m_trck,
 				 m_sect,
@@ -180,24 +178,7 @@ void thmfc1_device::cmd0_w(u8 data)
 			LOGSTAT0("free unset in stat0\n");
 		m_stat0 &= ~S0_FREE;
 		m_window_start = m_last_sync;
-		LOGSTATE("read_wait_header_sync start\n");
-		break;
-	case 2:
-		LOGCOMMAND("rhead unimplemented\n");
-		exit(0);
-	case 3:
-		LOGCOMMAND("read_sector start h=%d t=%d s=%d sz=%d\n",
-				 m_cmd1 & C1_SIDE ? 1 : 0,
-				 m_trck,
-				 m_sect,
-				 128 << ((m_cmd1 >> 5) & 3));
-		m_state = S_READ_WAIT_HEADER_SYNC;
-		m_bit_counter = 0;
-		if(m_stat0 & S0_FREE)
-			LOGSTAT0("free unset in stat0\n");
-		m_stat0 &= ~S0_FREE;
-		m_window_start = m_last_sync;
-		LOGSTATE("read_wait_header_sync start\n");
+		LOGSTATE("s_read_wait_header_sync start\n");
 		break;
 	}
 }
@@ -207,9 +188,8 @@ void thmfc1_device::cmd1_w(u8 data)
 	sync();
 
 	m_cmd1 = data;
-	m_sect_size = 128 << ((m_cmd1 >> 5) & 3);
 	LOGREGS("cmd1_w %02x, sector=(size=%d, side=%d) precomp=%d sync_only_when_ready=%s\n", m_cmd1,
-			 m_sect_size,
+			 128 << ((m_cmd1 >> 5) & 3),
 			 m_cmd1 & C1_SIDE ? 1 : 0,
 			 (m_cmd1 >> 1) & 7,
 			 m_cmd1 & C1_DSYRD ? "on" : "off");
@@ -258,7 +238,7 @@ void thmfc1_device::wdata_w(u8 data)
 	if(m_stat0 & S0_BYTE)
 		LOGSTAT0("byte unset in stat0\n");
 	if(m_stat0 & S0_DREQ)
-		LOGSTAT0("dreq unset in stat0\n");
+		LOGSTAT0("byte unset in stat0\n");
 	m_stat0 &= ~(S0_BYTE | S0_DREQ);
 	LOGREGS("wdata_w %02x\n", data);
 }
@@ -451,12 +431,12 @@ bool thmfc1_device::write_one_bit(u64 limit)
 
 	if(m_bit_counter & 1)
 		m_bit = (m_shift_data_reg >> 7);
-	else {
-		if(m_use_shift_clk_reg)
-			m_bit = (m_shift_clk_reg >> 7);
-		else
-			m_bit = !(m_bit || (m_shift_data_reg >> 7)); // MFM
-	}
+	else if(m_use_shift_clk_reg)
+                m_bit = (m_shift_clk_reg >> 7);
+        else if(m_cmd0 & C0_FM)
+                m_bit = 1;
+        else
+                m_bit = !(m_bit || (m_shift_data_reg >> 7));
 
 	LOGSHIFT("write %s bit[%x]=%d c=0x%02x d=0x%02x crc=0x%04x\n",
 		m_bit_counter & 1 ? "[d]" : "[c]", m_bit_counter, m_bit,
@@ -528,7 +508,7 @@ void thmfc1_device::sync()
 				m_bit_counter = 0;
 				m_byte_counter = 0;
 				m_state = S_READ_VERIFY_HEADER;
-				LOGSTATE("read_wait_header_sync end (wdata=0x%02x clk=0x%02x)\n", m_wdata, m_clk);
+				LOGSTATE("s_read_wait_header_sync end rdata=0x%02x clk=0x%02x\n", m_rdata, m_clk);
 			}
 			break;
 
@@ -538,60 +518,67 @@ void thmfc1_device::sync()
 			if(m_bit_counter)
 				break;
 			m_byte_counter++;
-			LOGSTATE("read_verify_header byte_counter=%d\n", m_byte_counter);
 			bool valid = true;
 			switch(m_byte_counter) {
 			case 1:
 			case 2:
 				valid = m_stat0 & S0_SYNC;
-				LOGSTATE("read_verify_header rdata=0x%02x clk=0x%02x\n", m_rdata, m_clk);
+				LOGSTATE("s_read_verify_header rdata[%d]=0x%02x clk=0x%02x\n", m_byte_counter, m_rdata, m_clk);
 				break;
 			case 3:
 				valid = m_rdata == 0xfe;
-				LOGSTATE("read_verify_header rdata=0x%02x\n", m_rdata);
+				LOGSTATE("s_read_verify_header rdata[%d]=0x%02x\n", m_byte_counter, m_rdata);
+				if(valid && (m_cmd0 & 3) == 2) {
+					m_byte_counter = 0;
+					m_state = S_READ;
+					LOGSTATE("s_read_verify_header end\n");
+					LOGSTATE("s_read start\n");
+				}
 				break;
 			case 4:
 				valid = m_rdata == m_trck;
-				LOGSTATE("read_verify_header rdata=0x%02x trck=0x%02x\n", m_rdata, m_trck);
+				LOGSTATE("s_read_verify_header rdata[%d]=0x%02x trck=%d\n", m_byte_counter, m_rdata, m_trck);
 				break;
 			case 5:
 				// The THMFC1 BIOS always sets side to zero in the sector header.
                                 // This is a difference wrt to wd177x MFM/MF track format description
 				valid = (m_rdata & 1) == (m_cmd1 & C1_SIDE ? 1 : 0);
-				LOGSTATE("read_verify_header rdata=0x%02x side=0x%02x\n", m_rdata, m_cmd1 & C1_SIDE ? 1 : 0);
+				LOGSTATE("s_read_verify_header rdata[%d]=0x%02x side=%d\n", m_byte_counter, m_rdata, m_cmd1 & C1_SIDE ? 1 : 0);
 				break;
 			case 6:
 				valid = m_rdata == m_sect;
-				LOGSTATE("read_verify_header rdata=0x%02x sect=0x%02x\n", m_rdata, m_sect);
+				LOGSTATE("s_read_verify_header rdata[%d]=0x%02x sect=%d\n", m_byte_counter, m_rdata, m_sect);
 				break;
 			case 7:
 				valid = (m_rdata & 3) == ((m_cmd1 >> 5) & 3);
-				LOGSTATE("read_verify_header rdata=0x%02x len=0x%02x\n", m_rdata, (m_cmd1 >> 5) & 3);
+				LOGSTATE("s_read_verify_header rdata[%d]=0x%02x sz=%d\n", m_byte_counter, m_rdata, 128 << ((m_cmd1 >> 5) & 3));
 				break;
 				// 8 skipped
 			case 9:
 				valid = m_crc == 0;
-				LOGSTATE("read_verify_header crc=0x%04x\n", m_crc);
+				LOGSTATE("s_read_verify_header crc[%d]=0x%04x\n", m_byte_counter, m_crc);
 				if(valid) {
 					m_byte_counter = 0;
+					LOGSTATE("s_read_verify_header end\n");
 					switch(m_cmd0 & 3) {
 						case 1:
 							m_state = S_WRITE_SKIP_GAP;
-							LOGSTATE("read_verify_header end, go to write_skip_gap\n");
+							LOGSTATE("s_write_skip_gap start\n");
 							break;
 						case 3:
 							m_state = S_READ_SKIP_GAP;
-							LOGSTATE("read_verify_header end, go to read_skip_gap\n");
+							LOGSTATE("s_read_skip_gap start\n");
 							break;
 						default:
 							m_state = S_READ_WAIT_HEADER_SYNC;
-							LOGSTATE("read_verify_header end, go to wait_header_sync\n");
+							LOGSTATE("s_wait_header_sync start\n");
 					}
 				}
 			}
 			if(!valid) {
 				m_state = S_READ_WAIT_HEADER_SYNC;
-				LOGSTATE("read_verify_header failed, restart wait_header_sync\n");
+				LOGSTATE("s_read_verify_header end (%s)\n", m_byte_counter < 9 ? "no match" : "crc error");
+				LOGSTATE("s_wait_header_sync start\n");
 			}
 			break;
 		}
@@ -605,7 +592,8 @@ void thmfc1_device::sync()
 			if(m_byte_counter == 27) {
 				m_byte_counter = 0;
 				m_state = S_READ_WAIT_SECTOR_SYNC;
-				LOGSTATE("read_skip_gap end\n");
+				LOGSTATE("s_read_skip_gap end\n");
+				LOGSTATE("s_read_wait_sector_sync start\n");
 			}
 			break;
 
@@ -620,8 +608,8 @@ void thmfc1_device::sync()
 					LOGSTAT0("dreq set in stat0\n");
 				m_stat0 |= S0_DREQ;
 				m_state = S_READ_VERIFY_SECTOR;
-				LOGSTATE("read_wait_sector_sync end (wdata=0x%02x clk=0x%02x)\n", m_wdata, m_clk);
-				LOGCRC("crc=0x%04x\n", m_crc);
+				LOGSTATE("s_read_wait_sector_sync end rdata[%d]=0x%02x clk=0x%02x\n", m_byte_counter, m_rdata, m_clk);
+				LOGSTATE("s_read_verify_sector start\n");
 				break;
 			}
 			if(m_bit_counter)
@@ -629,7 +617,8 @@ void thmfc1_device::sync()
 			m_byte_counter++;
 			if(m_byte_counter == 42) {
 				m_state = S_READ_WAIT_HEADER_SYNC;
-				LOGSTATE("read_wait_sector_sync failed, restart wait_header_sync\n");
+				LOGSTATE("s_read_wait_sector_sync end (timeout)\n");
+				LOGSTATE("s_wait_header_sync start\n");
 			}
 			break;
 
@@ -639,57 +628,39 @@ void thmfc1_device::sync()
 			if(m_bit_counter)
 				break;
 			m_byte_counter++;
-			LOGSTATE("read_verify_sector byte_counter=%d\n", m_byte_counter);
 			bool valid = true;
 			switch(m_byte_counter) {
 			case 1:
 			case 2:
 				valid = m_stat0 & S0_SYNC;
-				LOGSTATE("read_verify_sector rdata=0x%02x clk=0x%02x\n", m_rdata, m_clk);
-				LOGCRC("crc=0x%04x\n", m_crc);
+				LOGSTATE("s_read_verify_sector rdata[%d]=0x%02x clk=0x%02x\n", m_byte_counter, m_rdata, m_clk);
 				break;
 			case 3:
 				valid = m_rdata == 0xfb;
-				LOGSTATE("read_verify_sector rdata=0x%02x\n", m_rdata);
-				LOGCRC("crc=0x%04x\n", m_crc);
+				LOGSTATE("s_read_verify_sector rdata[%d]=0x%02x\n", m_byte_counter, m_rdata);
 				if(valid) {
 					m_byte_counter = 0;
-					m_state = S_READ_SECTOR;
-					LOGSTATE("read_verify_sector end\n");
+					m_state = S_READ;
+					LOGSTATE("s_read_verify_sector end\n");
+					LOGSTATE("s_read start\n");
 				}
 			}
 			if(!valid) {
 				m_state = S_READ_WAIT_HEADER_SYNC;
-				LOGSTATE("read_verify_sector failed, restart wait_header_sync\n");
+				LOGSTATE("s_read_verify_sector end (%s)\n", m_byte_counter < 3 ? "not enough sync" : "bad delimiter");
+				LOGSTATE("s_read_wait_header_sync start\n");
 			}
 			break;
 		}
 
-		case S_READ_SECTOR:
+		case S_READ: {
+			bool overflow = (m_cmd0 & 1) ? m_stat0 & S0_BYTE : m_stat0 & S0_DREQ;
 			if(read_one_bit(next_sync, next_flux_change))
 				return;
 			if(m_bit_counter)
 				break;
 			m_byte_counter++;
-			if(m_byte_counter == m_sect_size) {
-				m_byte_counter = 0;
-				m_state = S_READ_SECTOR_CRC;
-				LOGSTATE("read_sector end\n");
-				break;
-			}
-			LOGSTATE("read_sector byte_counter=%d rdata=0x%02x\n", m_byte_counter, m_rdata);
-			LOGCRC("crc=0x%04x\n", m_crc);
-			break;
-
-		case S_READ_SECTOR_CRC:
-			if(read_one_bit(next_sync, next_flux_change))
-				return;
-			if(m_bit_counter)
-				break;
-			m_byte_counter++;
-			LOGSTATE("read_sector_crc byte_counter=%d rdata=0x%02x\n", m_byte_counter, m_rdata);
-			LOGCRC("crc=0x%04x\n", m_crc);
-			if(m_byte_counter == 2) {
+			if(overflow) {
 				if(m_crc) {
 					if(~m_stat0 & S0_CRCER)
 						LOGSTAT0("crcer set in stat0\n");
@@ -697,12 +668,23 @@ void thmfc1_device::sync()
 				}
 				if(~m_stat0 & S0_FREE)
 					LOGSTAT0("free set in stat0\n");
+				if(m_stat0 & S0_DREQ)
+					LOGSTAT0("dreq unset in stat0\n");
 				m_stat0 |= S0_FREE;
+				m_stat0 &= ~S0_DREQ;
 				m_cmd0 &= ~3;
 				m_state = S_READ_WAIT_HEADER_SYNC;
-				LOGSTATE("read_sector_crc end\n");
+				LOGSTATE("s_read end\n");
+				LOGSTATE("s_read_wait_header_sync start\n");
+				break;
+			} else {
+				if(~m_stat0 & S0_DREQ)
+					LOGSTAT0("dreq set in stat0\n");
+				m_stat0 |= S0_DREQ;
 			}
+			LOGSTATE("s_read rdata[%d]=0x%02x\n", m_byte_counter, m_rdata);
 			break;
+		}
 
 		case S_WRITE_SKIP_GAP:
 			if(read_one_bit(next_sync, next_flux_change))
@@ -714,7 +696,8 @@ void thmfc1_device::sync()
 				m_byte_counter = 0;
 				m_shift_data_reg = 0;
 				m_state = S_WRITE_SECTOR_SYNC;
-				LOGSTATE("write_skip_gap end\n");
+				LOGSTATE("s_write_skip_gap end\n");
+				LOGSTATE("s_write_sector_sync start\n");
 			}
 			break;
 
@@ -734,59 +717,69 @@ void thmfc1_device::sync()
 					LOGSTAT0("dreq set in stat0\n");
 				m_stat0 |= S0_DREQ;
 				m_state = S_WRITE_SECTOR;
-				LOGSTATE("write_sector_sync end reset crc\n");
+				LOGSTATE("s_write_sector_sync end\n");
+				LOGSTATE("s_write_sector start\n");
 			}
 			break;
 
-		case S_WRITE_SECTOR:
+		case S_WRITE_SECTOR: {
+			bool overflow = m_stat0 & S0_BYTE;
+			if(m_bit_counter == 0) {
+				m_shift_data_reg = m_wdata;
+				if(m_use_shift_clk_reg && m_wdata != 0xa1)
+					m_use_shift_clk_reg = false;
+				m_shift_clk_reg = m_clk;
+				LOGSTATE("s_write_sector shift_data_reg[%d]=0x%02x\n", m_byte_counter, m_shift_data_reg);
+			}
 			if(write_one_bit(next_sync))
 				return;
 			if(m_bit_counter)
 				break;
 			m_byte_counter++;
-			LOGSTATE("write_sector byte_counter=%d shift_data_reg=0x%02x\n", m_byte_counter, m_shift_data_reg);
-			LOGCRC("crc=0x%04x\n", m_crc);
-			if(m_byte_counter == m_sect_size + 4) {
+			if(overflow) {
 				m_byte_counter = 0;
-				m_shift_data_reg = m_crc >> 8;
-				m_state = S_WRITE_SECTOR_CRC;
-				LOGSTATE("write_sector end\n");
+				m_state = S_WRITE_CRC;
+				LOGSTATE("s_write_sector end\n");
+				LOGSTATE("s_write_crc start\n");
 				break;
 			}
-			m_shift_data_reg = m_wdata;
-			if(m_use_shift_clk_reg && m_wdata != 0xa1)
-				m_use_shift_clk_reg = false;
-			m_shift_clk_reg = m_clk;
 			if(~m_stat0 & S0_DREQ)
 				LOGSTAT0("dreq set in stat0\n");
 			m_stat0 |= S0_DREQ;
 			break;
+		}
 
-		case S_WRITE_SECTOR_CRC:
+		case S_WRITE_CRC:
+			if(m_bit_counter == 0){
+				m_shift_data_reg = m_crc >> 8;
+				LOGSTATE("s_write_crc shift_data_reg[%d]=0x%02x\n", m_byte_counter, m_shift_data_reg);
+			}
 			if(write_one_bit(next_sync))
 				return;
 			if(m_bit_counter)
 				break;
 			m_byte_counter++;
-			LOGSTATE("write_sector_crc byte_counter=%d shift_data_reg=0x%02x\n", m_byte_counter, m_shift_data_reg);
-			LOGCRC("crc=0x%04x\n", m_crc);
-			m_shift_data_reg = m_crc >> 8;
 			if(m_byte_counter == 2) {
 				if(~m_stat0 & S0_FREE)
 					LOGSTAT0("free set in stat0\n");
+				if(m_stat0 & S0_DREQ)
+                                        LOGSTAT0("dreq unset in stat0\n");
 				m_stat0 |= S0_FREE;
+				m_stat0 &= ~S0_DREQ;
+                                m_cmd0 &= ~3;
 				m_state = S_READ_WAIT_HEADER_SYNC;
 				flush_flux();
-				LOGSTATE("write_sector_crc end\n");
+				LOGSTATE("s_write_crc end\n");
+				LOGSTATE("s_read_wait_header_sync start\n");
 			}
 			break;
 
 		case S_FORMAT:
 			if(m_bit_counter == 0) {
-				LOGSTATE("format shift_data_reg=0x%02x\n", m_shift_data_reg);
 				m_shift_data_reg = m_wdata;
 				m_shift_clk_reg = m_clk;
 				m_use_shift_clk_reg = (m_clk == 0x0a);
+				LOGSTATE("s_format shift_data_reg[%d]=0x%02x\n", m_byte_counter, m_shift_data_reg);
 			}
 			if(write_one_bit(next_sync))
 				return;

@@ -62,12 +62,11 @@ private:
 		S_READ_SKIP_GAP,
 		S_READ_WAIT_SECTOR_SYNC,
 		S_READ_VERIFY_SECTOR,
-		S_READ_SECTOR,
-		S_READ_SECTOR_CRC,
+		S_READ,
 		S_WRITE_SKIP_GAP,
 		S_WRITE_SECTOR_SYNC,
 		S_WRITE_SECTOR,
-		S_WRITE_SECTOR_CRC,
+		S_WRITE_CRC,
 		S_FORMAT,
 	};
 
@@ -86,7 +85,6 @@ private:
 
 	u8 m_cmd0, m_cmd1, m_cmd2, m_stat0;
 	u8 m_rdata, m_wdata, m_clk, m_sect, m_trck, m_cell;
-	u16 m_sect_size;
 
 	bool m_use_shift_clk_reg;
 
