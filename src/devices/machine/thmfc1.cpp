@@ -523,6 +523,9 @@ void thmfc1_device::sync()
 				LOGSTATE("s_read_verify_header rdata[%d]=0x%02x\n", m_byte_counter, m_rdata);
 				if(valid && (m_cmd0 & 3) == 2) {
 					m_byte_counter = 0;
+					if(~m_stat0 & S0_DREQ)
+						LOGSTAT0("dreq set in stat0\n");
+					m_stat0 |= S0_DREQ;
 					m_state = S_READ;
 					LOGSTATE("s_read_verify_header end\n");
 					LOGSTATE("s_read start\n");
@@ -595,9 +598,6 @@ void thmfc1_device::sync()
 				m_crc = crc_from_data(m_wdata);
 				m_bit_counter = 0;
 				m_byte_counter = 0;
-				if(~m_stat0 & S0_DREQ)
-					LOGSTAT0("dreq set in stat0\n");
-				m_stat0 |= S0_DREQ;
 				m_state = S_READ_VERIFY_SECTOR;
 				LOGSTATE("s_read_wait_sector_sync end rdata[%d]=0x%02x clk=0x%02x\n", m_byte_counter, m_rdata, m_clk);
 				LOGSTATE("s_read_verify_sector start\n");
@@ -619,6 +619,9 @@ void thmfc1_device::sync()
 			if(m_bit_counter)
 				break;
 			m_byte_counter++;
+			if(~m_stat0 & S0_DREQ)
+				LOGSTAT0("dreq set in stat0\n");
+			m_stat0 |= S0_DREQ;
 			bool valid = true;
 			switch(m_byte_counter) {
 			case 1:
@@ -645,7 +648,7 @@ void thmfc1_device::sync()
 		}
 
 		case S_READ: {
-			bool overflow = (m_cmd0 & 1) ? m_stat0 & S0_BYTE : m_stat0 & S0_DREQ;
+			bool overflow = m_stat0 & S0_DREQ;
 			if(read_one_bit(next_sync, next_flux_change))
 				return;
 			if(m_bit_counter)
@@ -701,12 +704,12 @@ void thmfc1_device::sync()
 			if(m_byte_counter == 12) {
 				m_crc = 0xffff;
 				m_byte_counter = 0;
-				m_shift_clk_reg = m_clk;
-				m_shift_data_reg = m_wdata;
-				m_use_shift_clk_reg = true;
 				if(~m_stat0 & S0_DREQ)
 					LOGSTAT0("dreq set in stat0\n");
 				m_stat0 |= S0_DREQ;
+				m_shift_clk_reg = m_clk;
+				m_shift_data_reg = m_wdata;
+				m_use_shift_clk_reg = true;
 				m_state = S_WRITE_SECTOR;
 				LOGSTATE("s_write_sector_sync end\n");
 				LOGSTATE("s_write_sector start\n");
@@ -714,7 +717,7 @@ void thmfc1_device::sync()
 			break;
 
 		case S_WRITE_SECTOR: {
-			bool overflow = m_stat0 & S0_BYTE;
+			bool overflow = m_stat0 & S0_DREQ;
 			if(m_bit_counter == 0) {
 				m_shift_data_reg = m_wdata;
 				if(m_use_shift_clk_reg && m_wdata != 0xa1)
@@ -727,6 +730,9 @@ void thmfc1_device::sync()
 			if(m_bit_counter)
 				break;
 			m_byte_counter++;
+			if(~m_stat0 & S0_DREQ)
+				LOGSTAT0("dreq set in stat0\n");
+			m_stat0 |= S0_DREQ;
 			if(overflow) {
 				m_byte_counter = 0;
 				m_state = S_WRITE_CRC;
@@ -734,9 +740,6 @@ void thmfc1_device::sync()
 				LOGSTATE("s_write_crc start\n");
 				break;
 			}
-			if(~m_stat0 & S0_DREQ)
-				LOGSTAT0("dreq set in stat0\n");
-			m_stat0 |= S0_DREQ;
 			break;
 		}
 
@@ -754,14 +757,18 @@ void thmfc1_device::sync()
 				if(~m_stat0 & S0_FREE)
 					LOGSTAT0("free set in stat0\n");
 				if(m_stat0 & S0_DREQ)
-                                        LOGSTAT0("dreq unset in stat0\n");
+					LOGSTAT0("dreq unset in stat0\n");
 				m_stat0 |= S0_FREE;
 				m_stat0 &= ~S0_DREQ;
-                                m_cmd0 &= ~3;
+				m_cmd0 &= ~3;
 				m_state = S_READ_WAIT_HEADER_SYNC;
 				flush_flux();
 				LOGSTATE("s_write_crc end\n");
 				LOGSTATE("s_read_wait_header_sync start\n");
+			} else {
+				if(~m_stat0 & S0_DREQ)
+					LOGSTAT0("dreq set in stat0\n");
+				m_stat0 |= S0_DREQ;
 			}
 			break;
 
