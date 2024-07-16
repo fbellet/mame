@@ -254,6 +254,7 @@ const help_item f_static_help_list[] =
 		"  comadd[//] <address>,<comment> -- adds a comment to the disassembled code at given address\n"
 		"  comdelete <address> -- removes a comment from the given address\n"
 		"  comsave -- save the current comments to a file\n"
+		"  comcolor <address>,<color> -- change color of the dissassembled code at given address\n"
 		"  comlist -- print currently available comments from file\n"
 		"  commit[/*] <address>,<comment> -- gives a bulk comadd then comsave command\n"
 		"\n"
@@ -1782,6 +1783,22 @@ const help_item f_static_help_list[] =
 		"\n"
 		"comsave\n"
 		"  Saves the comments to the driver's comment file\n"
+		"\n"
+	},
+	{
+		"comcolor",
+		"\n"
+		"  comcolor <address>,<color>\n"
+		"\n"
+		"Change the color of an existing comment to the disassembled code at <address>. Color can be in hexadecimal RGBA representation, or in symbolic name (red, green, blue...).\n"
+		"\n"
+		"Examples:\n"
+		"\n"
+		"comcolor 0, red\n"
+		"  Set the comment at address 0x0 in color red\n"
+		"\n"
+		"comcolor 10, 0000ff00\n"
+		"  Set the comment at address 0x10 in color blue\n"
 		"\n"
 	},
 	{

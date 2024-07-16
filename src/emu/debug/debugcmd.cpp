@@ -227,6 +227,7 @@ debugger_commands::debugger_commands(running_machine& machine, debugger_cpu& cpu
 	m_console.register_command("comlist",   CMDFLAG_NONE, 0, 0, std::bind(&debugger_commands::execute_comment_list, this, _1));
 	m_console.register_command("commit",    CMDFLAG_NONE, 1, 2, std::bind(&debugger_commands::execute_comment_commit, this, _1));
 	m_console.register_command("/*",        CMDFLAG_NONE, 1, 2, std::bind(&debugger_commands::execute_comment_commit, this, _1));
+	m_console.register_command("comcolor",  CMDFLAG_NONE, 1, 2, std::bind(&debugger_commands::execute_comment_color, this, _1));
 
 	m_console.register_command("bpset",     CMDFLAG_NONE, 1, 3, std::bind(&debugger_commands::execute_bpset, this, _1));
 	m_console.register_command("bp",        CMDFLAG_NONE, 1, 3, std::bind(&debugger_commands::execute_bpset, this, _1));
@@ -1330,7 +1331,6 @@ void debugger_commands::execute_comment_save(const std::vector<std::string_view>
 		m_console.printf("Comment not saved\n");
 }
 
-// TODO: add color hex editing capabilities for comments, see below for more info
 /**
  * @fn void execute_comment_color(const std::vector<std::string_view> &params)
  * @brief Modifies comment given at address $xx with given color
@@ -1342,7 +1342,55 @@ void debugger_commands::execute_comment_save(const std::vector<std::string_view>
  *
  */
 
+void debugger_commands::execute_comment_color(const std::vector<std::string_view> &params)
+{
+	// param 1 is the address for the comment
+	u64 address;
+	if (!m_console.validate_number_parameter(params[0], address))
+		return;
 
+	// CPU parameter is implicit
+	device_t *cpu;
+	if (!m_console.validate_cpu_parameter(std::string_view(), cpu))
+		return;
+
+	// make sure param 2 exists
+	if (params[1].empty())
+	{
+		m_console.printf("Error : color empty\n");
+		return;
+	}
+
+	// Now try parsing the color
+	u64 color_data;
+	rgb_t color = rgb_t::green();
+	const char *colors_text[] = { "white", "black", "red", "lime", "blue", "yellow", "cyan",
+		"magenta", "silver", "gray", "maroon", "olive", "green", "purple", "teal", "navy" };
+	u32 colors_rgb[] = { 0x000000, 0xffffff, 0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0x00ffff,
+		0xff00ff, 0xc0c0c0, 0x808080, 0x800000, 0x808000, 0x008000, 0x800080, 0x008080, 0x000080};
+	int i;
+	for (i = 0; i < 16; i++)
+		if (std::string(params[1]).compare(colors_text[i]) == 0) {
+			color = rgb_t(colors_rgb[i] << 8);
+			break;
+	}
+	if (i == 16) {
+		if (m_console.validate_number_parameter(params[1], color_data))
+			color = rgb_t(color_data);
+		else {
+			m_console.printf("The color parameter cannot be interpreted\n");
+			return;
+		}
+	}
+
+	const char *text = cpu->debug()->comment_text(address);
+	if (text == nullptr) {
+		m_console.printf("No comment exists at this address\n");
+		return;
+	}
+	cpu->debug()->comment_add(address, text, color);
+	cpu->machine().debug_view().update_all(DVT_DISASSEMBLY);
+}
 
 /*-------------------------------------------------
     execute_bpset - execute the breakpoint set
