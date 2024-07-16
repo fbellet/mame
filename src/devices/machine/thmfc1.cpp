@@ -158,7 +158,6 @@ void thmfc1_device::cmd0_w(u8 data)
 			m_state = S_FORMAT;
 			m_bit_counter = 0;
 			m_byte_counter = 0;
-			m_use_shift_clk_reg = (m_clk == 0x0a);
 			m_window_start = m_last_sync;
 			LOGSTATE("s_format start\n");
 		} else {
@@ -720,7 +719,7 @@ void thmfc1_device::sync()
 				m_stat0 |= S0_DREQ;
 				m_shift_clk_reg = m_clk;
 				m_shift_data_reg = m_wdata;
-				m_use_shift_clk_reg = true;
+				m_use_shift_clk_reg = (m_wdata == 0xa1 && m_clk == 0x0a);
 				m_state = S_WRITE_SECTOR;
 				LOGSTATE("s_write_sector_sync end\n");
 				LOGSTATE("s_write_sector start\n");
@@ -730,10 +729,9 @@ void thmfc1_device::sync()
 		case S_WRITE_SECTOR: {
 			bool overflow = m_stat0 & S0_DREQ;
 			if(m_bit_counter == 0) {
-				m_shift_data_reg = m_wdata;
-				if(m_use_shift_clk_reg && m_wdata != 0xa1)
-					m_use_shift_clk_reg = false;
 				m_shift_clk_reg = m_clk;
+				m_shift_data_reg = m_wdata;
+				m_use_shift_clk_reg = (m_wdata == 0xa1 && m_clk == 0x0a);
 				LOGSTATE("s_write_sector shift_data_reg[%d]=0x%02x\n", m_byte_counter, m_shift_data_reg);
 			}
 			if(write_one_bit(next_sync))
@@ -785,9 +783,9 @@ void thmfc1_device::sync()
 
 		case S_FORMAT:
 			if(m_bit_counter == 0) {
-				m_shift_data_reg = m_wdata;
 				m_shift_clk_reg = m_clk;
-				m_use_shift_clk_reg = (m_clk == 0x0a);
+				m_shift_data_reg = m_wdata;
+				m_use_shift_clk_reg = (m_wdata == 0xa1 && m_clk == 0x0a);
 				LOGSTATE("s_format shift_data_reg[%d]=0x%02x\n", m_byte_counter, m_shift_data_reg);
 			}
 			if(write_one_bit(next_sync))
