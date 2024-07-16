@@ -9,7 +9,9 @@
 // - Emulation of FREE stat0 bit should be tested with real hardware:
 //   FREE is not set when the controller received a RESET cmd after an
 //   interrupted RSECT cmd (tested with analpiste_to8).
-// - FM coding is implemented, but unused with real hardware.
+// - FM coding is implemented, but unused in real hardware.
+// - RHEAD cmd is implemented, tested in mame, but unused in real
+//   hardware
 
 #include "emu.h"
 #include "thmfc1.h"
@@ -375,6 +377,9 @@ bool thmfc1_device::read_one_bit(u64 limit, u64 &next_flux_change)
 
 	m_last_sync = window_end;
 
+        if (m_cur_floppy == nullptr)
+                return false;
+
 	m_shift_reg = (m_shift_reg << 1) | m_bit;
 	if(m_bit_counter & 1) {
 		m_shift_data_reg = (m_shift_data_reg << 1) | m_bit;
@@ -385,12 +390,9 @@ bool thmfc1_device::read_one_bit(u64 limit, u64 &next_flux_change)
 	} else
 		m_shift_clk_reg = (m_shift_clk_reg << 1) | m_bit;
 
-	static int count = -1;
-	count++;
-	if (m_shift_reg || (count & 0xfff) == 0)
-		LOGSHIFT("read %s bit[%x]=%d shift_reg=0x%04x c=0x%02x d=0x%02x crc=0x%04x\n",
-			m_bit_counter & 1 ? "[d]" : "[c]", m_bit_counter, m_bit,
-			m_shift_reg, m_shift_clk_reg, m_shift_data_reg, m_crc);
+        LOGSHIFT("read %s bit[%x]=%d shift_reg=0x%04x c=0x%02x d=0x%02x crc=0x%04x\n",
+                m_bit_counter & 1 ? "[d]" : "[c]", m_bit_counter, m_bit,
+                m_shift_reg, m_shift_clk_reg, m_shift_data_reg, m_crc);
 
 	m_bit_counter++;
 	m_bit_counter &= 0xf;
