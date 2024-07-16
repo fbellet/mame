@@ -107,6 +107,7 @@ private:
 	void execute_comment_save(const std::vector<std::string_view> &params);
 	void execute_comment_list(const std::vector<std::string_view> &params);
 	void execute_comment_commit(const std::vector<std::string_view> &params);
+	void execute_comment_color(const std::vector<std::string_view> &params);
 	void execute_bpset(const std::vector<std::string_view> &params);
 	void execute_bpclear(const std::vector<std::string_view> &params);
 	void execute_bpdisenable(bool enable, const std::vector<std::string_view> &params);
