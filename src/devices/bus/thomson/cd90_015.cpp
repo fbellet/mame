@@ -85,7 +85,7 @@ void cd90_015_device::device_add_mconfig(machine_config &config)
 	MC6843(config, m_fdc, DERIVED_CLOCK(1, 2)); // Comes from the main board
 	m_fdc->force_ready();
 	FLOPPY_CONNECTOR(config, m_floppy[0], floppy_drives, "ud90_070", floppy_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, m_floppy[1], floppy_drives, nullptr,    floppy_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[1], floppy_drives, "ud90_070", floppy_formats).enable_sound(true);
 	FLOPPY_CONNECTOR(config, m_floppy[2], floppy_drives, nullptr,    floppy_formats).enable_sound(true);
 	FLOPPY_CONNECTOR(config, m_floppy[3], floppy_drives, nullptr,    floppy_formats).enable_sound(true);
 }
