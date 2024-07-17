@@ -600,6 +600,7 @@ void mc6843_device::run(bool timeout, bool ready, bool index)
 
 			else {
 				m_dor_needed = true;
+				m_dor_loaded = false;
 				live_start(L_DAM_WAIT);
 			}
 			return;
@@ -947,7 +948,7 @@ void mc6843_device::live_run(attotime limit)
 				if(!m_dor_loaded)
 					m_strb |= SB_DTERR;
 				m_dor_loaded = false;
-				if(byte == 128)
+				if(byte == 134)
 					m_dor_needed = false;
 				m_cur_live.shift_reg = 0xaaaa |
 					(m_dor & 0x80 ? 1<<14 : 0) |
