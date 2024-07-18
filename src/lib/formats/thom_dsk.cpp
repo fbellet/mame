@@ -24,12 +24,12 @@ const char *thomson_525_format::extensions() const noexcept
 
 const thomson_525_format::format thomson_525_format::formats[] = {
 	{
-		floppy_image::FF_525, floppy_image::SSSD, floppy_image::FM,
-		4000,
-		16, 40, 1,
-		128, {},
+		floppy_image::FF_525, floppy_image::DSDD, floppy_image::MFM,
+		2000,
+		16, 40, 2,
+		256, {},
 		1, {},
-		17, 22, 12
+		31, 22, 44
 	},
 	{
 		floppy_image::FF_525, floppy_image::SSDD, floppy_image::MFM,
@@ -40,12 +40,12 @@ const thomson_525_format::format thomson_525_format::formats[] = {
 		31, 22, 44
 	},
 	{
-		floppy_image::FF_525, floppy_image::DSDD, floppy_image::MFM,
-		2000,
-		16, 40, 2,
-		256, {},
+		floppy_image::FF_525, floppy_image::SSSD, floppy_image::FM,
+		4000,
+		16, 40, 1,
+		128, {},
 		1, {},
-		31, 22, 44
+		17, 22, 12
 	},
 	{}
 };
@@ -80,12 +80,12 @@ const char *thomson_35_format::extensions() const noexcept
 // of 4-sided disk that can be inserted into 2 drives at once.
 const thomson_35_format::format thomson_35_format::formats[] = {
 	{
-		floppy_image::FF_35, floppy_image::SSSD, floppy_image::FM,
-		4000,
-		16, 80, 1,
-		128, {},
+		floppy_image::FF_35, floppy_image::DSDD, floppy_image::MFM,
+		2000,
+		16, 80, 2,
+		256, {},
 		1, {},
-		17, 12, 22
+		31, 22, 44
 	},
 	{
 		floppy_image::FF_35, floppy_image::SSDD, floppy_image::MFM,
@@ -96,12 +96,12 @@ const thomson_35_format::format thomson_35_format::formats[] = {
 		31, 22, 44
 	},
 	{
-		floppy_image::FF_35, floppy_image::DSDD, floppy_image::MFM,
-		2000,
-		16, 80, 2,
-		256, {},
+		floppy_image::FF_35, floppy_image::SSSD, floppy_image::FM,
+		4000,
+		16, 80, 1,
+		128, {},
 		1, {},
-		31, 22, 44
+		17, 12, 22
 	},
 	{}
 };
