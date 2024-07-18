@@ -80,6 +80,14 @@ const char *thomson_35_format::extensions() const noexcept
 // of 4-sided disk that can be inserted into 2 drives at once.
 const thomson_35_format::format thomson_35_format::formats[] = {
 	{
+		floppy_image::FF_35, floppy_image::SSSD, floppy_image::FM,
+		4000,
+		16, 80, 1,
+		128, {},
+		1, {},
+		17, 12, 22
+	},
+	{
 		floppy_image::FF_35, floppy_image::SSDD, floppy_image::MFM,
 		2000,
 		16, 80, 1,
@@ -101,6 +109,17 @@ const thomson_35_format::format thomson_35_format::formats[] = {
 int thomson_35_format::get_image_offset(const format &f, int head, int track) const
 {
 	return (track + (head ? f.track_count : 0)) * compute_track_size(f);
+}
+
+floppy_image_format_t::desc_e* thomson_35_format::get_desc_fm(const format &f, int &current_size, int &end_gap_index) const
+{
+	floppy_image_format_t::desc_e *desc = wd177x_format::get_desc_fm(f, current_size, end_gap_index);
+
+	// The format description differs from the wd177x format:
+	// the head id is always zero (in field 6)
+	desc[6] = { FM, 0x00, 1 };
+
+	return desc;
 }
 
 floppy_image_format_t::desc_e* thomson_35_format::get_desc_mfm(const format &f, int &current_size, int &end_gap_index) const

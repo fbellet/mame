@@ -1155,6 +1155,7 @@ INPUT_PORTS_END
 
 static void wd2793_formats(format_registration &fr)
 {
+	fr.add_fm_containers();
 	fr.add_mfm_containers();
 	fr.add(FLOPPY_THOMSON_35_FORMAT);
 }
