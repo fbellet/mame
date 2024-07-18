@@ -255,7 +255,7 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 	/* guess format */
 	switch ( size ) {
 	case 81920:
-		// floppy_image::FF_525, floppy_image::SSSD 16, 40, 1, 128
+		// floppy_image::FF_525, floppy_image::SSSD
 		f->tracks = 40;
 		f->sector_size = 128;
 		f->sectuse_size = 128;
@@ -264,21 +264,14 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	case 163840:
-		// floppy_image::FF_525, floppy_image::SSDD 16, 40, 1, 256
+		// floppy_image::FF_525, floppy_image::SSDD
 		f->tracks = 40;
 		f->sector_size = 256;
 		f->sectuse_size = 255;
 		f->heads = 1;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 
-		// floppy_image::FF_525, floppy_image::DSSD 16, 40, 2, 128
-		f->tracks = 40;
-		f->sector_size = 128;
-		f->sectuse_size = 128;
-		f->heads = 2;
-		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
-
-		// floppy_image::FF_35, floppy_image::SSSD 16, 80, 1, 128
+		// floppy_image::FF_35, floppy_image::SSSD
 		f->tracks = 80;
 		f->sector_size = 128;
 		f->sectuse_size = 128;
@@ -287,24 +280,17 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	case 327680:
-		// floppy_image::FF_35, floppy_image::SSDD 16, 80, 1, 256
+		// floppy_image::FF_35, floppy_image::SSDD
 		f->tracks = 80;
 		f->sector_size = 256;
 		f->sectuse_size = 255;
 		f->heads = 1;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 
-		// floppy_image::FF_525, floppy_image::DSDD 16, 40, 2, 256
+		// floppy_image::FF_525, floppy_image::DSDD
 		f->tracks = 40;
 		f->sector_size = 256;
 		f->sectuse_size = 255;
-		f->heads = 2;
-		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
-
-		// floppy_image::FF_35, floppy_image::DSSD 16, 80, 2, 128
-		f->tracks = 80;
-		f->sector_size = 128;
-		f->sectuse_size = 128;
 		f->heads = 2;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 		return IMGTOOLERR_CORRUPTIMAGE;
@@ -1228,6 +1214,12 @@ static imgtoolerr_t thom_create(imgtool::image &img,
 	case 25: if ( f->sector_size != 128 ) return IMGTOOLERR_PARAMCORRUPT; break;
 	case 40: break;
 	case 80: break;
+	default: return IMGTOOLERR_PARAMCORRUPT;
+	}
+
+	switch ( f->heads ) {
+	case 1: break;
+	case 2: if ( f->sector_size == 128 ) return IMGTOOLERR_PARAMCORRUPT; break;
 	default: return IMGTOOLERR_PARAMCORRUPT;
 	}
 
