@@ -82,6 +82,14 @@ int thomson_35_format::get_image_offset(const format &f, int head, int track) co
 
 const thomson_35_format::format thomson_35_format::formats[] = {
 	{
+		floppy_image::FF_35, floppy_image::SSSD, floppy_image::FM,
+		4000,
+		16, 80, 1,
+		128, {},
+		1, {},
+		17, 12, 22
+	},
+	{
 		floppy_image::FF_35, floppy_image::SSDD, floppy_image::MFM,
 		2000,
 		16, 80, 1,
@@ -99,6 +107,46 @@ const thomson_35_format::format thomson_35_format::formats[] = {
 	},
 	{}
 };
+
+floppy_image_format_t::desc_e* thomson_35_format::get_desc_fm(const format &f, int &current_size, int &end_gap_index) const
+{
+	// The format description differs from the wd177x format:
+	// the head id is always zero (in field 7)
+	static floppy_image_format_t::desc_e desc[23] = {
+		/* 00 */ { FM, 0xff, 0 },
+		/* 01 */ { SECTOR_LOOP_START, 0, 0 },
+		/* 02 */ {   FM, 0x00, 6 },
+		/* 03 */ {   CRC_CCITT_FM_START, 1 },
+		/* 04 */ {     RAW, 0xf57e, 1 },
+		/* 05 */ {     TRACK_ID_FM },
+		/* 06 */ {     FM, 0x00, 1 },
+		/* 07 */ {     SECTOR_ID_FM },
+		/* 08 */ {     SIZE_ID_FM },
+		/* 09 */ {   CRC_END, 1 },
+		/* 10 */ {   CRC, 1 },
+		/* 11 */ {   FM, 0xff, 0 },
+		/* 12 */ {   FM, 0x00, 6 },
+		/* 13 */ {   CRC_CCITT_FM_START, 2 },
+		/* 14 */ {     RAW, 0xf56f, 1 },
+		/* 15 */ {     SECTOR_DATA_FM, -1 },
+		/* 16 */ {   CRC_END, 2 },
+		/* 17 */ {   CRC, 2 },
+		/* 18 */ {   FM, 0xff, 0 },
+		/* 19 */ { SECTOR_LOOP_END },
+		/* 20 */ { FM, 0xff, 0 },
+		/* 21 */ { RAWBITS, 0xffff, 0 },
+		/* 22 */ { END }
+	};
+
+	desc[0].p2 = f.gap_1;
+	desc[1].p2 = f.sector_count - 1;
+	desc[11].p2 = f.gap_2;
+	desc[18].p2 = f.gap_3;
+
+	wd177x_format::get_desc_fm(f, current_size, end_gap_index);
+
+	return desc;
+}
 
 floppy_image_format_t::desc_e* thomson_35_format::get_desc_mfm(const format &f, int &current_size, int &end_gap_index) const
 {
