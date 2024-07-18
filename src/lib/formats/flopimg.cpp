@@ -1783,14 +1783,18 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 
 		// fe
 		if(shift_reg == 0xf57e) {       // address mark
-			if(idblk_count < 100)
+			if(idblk_count < 100) {
+				LOGBITSTREAM("idblk[%d] at pos %d\n", idblk_count, i+1);
 				idblk[idblk_count++] = i+1;
+			}
 		}
 		// f8, f9, fa, fb
 		if(shift_reg == 0xf56a || shift_reg == 0xf56b ||
 			shift_reg == 0xf56e || shift_reg == 0xf56f) {       // data mark
-			if(dblk_count < 100)
+			if(dblk_count < 100) {
+				LOGBITSTREAM("dblk[%d] at pos %d\n", dblk_count, i+1);
 				dblk[dblk_count++] = i+1;
+			}
 		}
 	}
 
@@ -1801,6 +1805,8 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 		[[maybe_unused]] uint8_t head = sbyte_mfm_r(bitstream, pos);
 		uint8_t sector = sbyte_mfm_r(bitstream, pos);
 		uint8_t size = sbyte_mfm_r(bitstream, pos);
+		LOGBITSTREAM("i=%d h=%d t=%d s=%d sz=%d at pos %d\n",
+				i, head, track, sector, size, idblk[i]);
 		if(size >= 8)
 			continue;
 		int ssize = 128 << size;
@@ -1818,6 +1824,7 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 		if(d_index == dblk_count)
 			continue;
 
+		LOGBITSTREAM("using dblk[%d] at pos %d\n", d_index, dblk[d_index]);
 		pos = dblk[d_index];
 
 		if(sectors.size() <= sector)
