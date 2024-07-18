@@ -3,7 +3,8 @@
 
 // CD 90-640 - Floppy drive controller built from a wd1770
 //
-// Handles up to two 5.25 dual-sided drives (DD 90-320)
+// Handles up to two 5.25 dual-sided drives (one DD 90-320 a second SD
+// 90-640 with the same specs)
 
 #ifndef MAME_BUS_THOMSON_CD90_640_H
 #define MAME_BUS_THOMSON_CD90_640_H
