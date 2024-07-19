@@ -127,6 +127,7 @@ static imgtoolerr_t markerrorsource(imgtoolerr_t err)
 		case IMGTOOLERR_OUTOFMEMORY:
 		case IMGTOOLERR_UNEXPECTED:
 		case IMGTOOLERR_BUFFERTOOSMALL:
+		case IMGTOOLERR_PARAMCORRUPT:
 			/* Do nothing */
 			break;
 

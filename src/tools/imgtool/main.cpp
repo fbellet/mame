@@ -179,8 +179,11 @@ static int parse_options(int argc, char *argv[], int minunnamed, int maxunnamed,
 					if (enum_value ==  entry->enum_value_end())
 						goto error;
 				}
-				else
-					entry->set_value(value);
+				else {
+					if (entry->set_value(value) == false)
+						util::stream_format(std::wcerr, L"parse_options: couldn't set option %s=%s, using default %s\n",
+							wstring_from_utf8(buf), wstring_from_utf8(value), wstring_from_utf8(entry->value()));
+				}
 			}
 		}
 	}

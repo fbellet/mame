@@ -116,8 +116,11 @@
 #include "multibyte.h"
 #include "opresolv.h"
 
+#include "osdcore.h" // osd_get_command_line
+
 #include <cstdio>
 #include <ctime>
+#include <iostream>
 
 
 #define MAXSIZE 80*16*256*2 /* room for two faces, double-density, 80 tracks */
@@ -261,6 +264,7 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 		f->sectuse_size = 128;
 		f->heads = 1;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	case 163840:
@@ -277,6 +281,7 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 		f->sectuse_size = 128;
 		f->heads = 1;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	case 327680:
@@ -293,6 +298,7 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 		f->sectuse_size = 255;
 		f->heads = 2;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	case 655360:
@@ -302,6 +308,7 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 		f->sectuse_size = 255;
 		f->heads = 2;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	case 51200:
@@ -310,6 +317,7 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 		f->sectuse_size = 128;
 		f->heads = 1;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	case 62400:
@@ -318,6 +326,7 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 		f->sectuse_size = 128;
 		f->heads = 2;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	default:
@@ -1208,6 +1217,9 @@ static imgtoolerr_t thom_create(imgtool::image &img,
 	case 1: f->sector_size = 256; f->sectuse_size = 255; break;
 	default: return IMGTOOLERR_PARAMCORRUPT;
 	}
+#ifdef IMGTOOL_DEBUG
+	util::stream_format(std::wcout, L"thom_create: sector_size=%d for selected density\n", f->sector_size);
+#endif
 
 	/* sanity checks */
 	switch ( f->tracks ) {
@@ -1219,7 +1231,12 @@ static imgtoolerr_t thom_create(imgtool::image &img,
 
 	switch ( f->heads ) {
 	case 1: break;
-	case 2: if ( f->sector_size == 128 ) return IMGTOOLERR_PARAMCORRUPT; break;
+	case 2:
+		if ( f->sector_size == 128 ) {
+			util::stream_format(std::wcerr, L"thom_create: 2 heads incompatible with single density (SSSD/SSDD/DSDD)\n");
+			return IMGTOOLERR_PARAMCORRUPT;
+		}
+		break;
 	default: return IMGTOOLERR_PARAMCORRUPT;
 	}
 
