@@ -231,7 +231,7 @@ void option_resolution::entry::parse_specification(const char *specification)
 	m_default_value.clear();
 
 	// is this even pertinent?
-	m_is_pertinent = (specification != nullptr) && (specification[0] != '\0');
+	m_is_pertinent = (specification != nullptr);
 	if (m_is_pertinent)
 	{
 		int value = 0;
@@ -241,7 +241,10 @@ void option_resolution::entry::parse_specification(const char *specification)
 		bool half_range = false;
 		size_t pos = 0;
 
-		m_ranges.emplace_back();
+		if (specification[pos] && specification[pos] != ';')
+		{
+			m_ranges.emplace_back();
+		}
 
 		while (specification[pos] && !isalpha(specification[pos]))
 		{
@@ -299,7 +302,7 @@ void option_resolution::entry::parse_specification(const char *specification)
 			}
 			else if (isdigit(specification[pos]))
 			{
-				// numeric value */
+				// numeric value
 				value = 0;
 				do
 				{
@@ -314,6 +317,35 @@ void option_resolution::entry::parse_specification(const char *specification)
 				}
 				m_ranges.back().max = value;
 				in_range = false;
+			}
+			else if (specification[pos] == '\'')
+			{
+				m_ranges.clear();
+
+				// string value
+				pos++;
+				char *str_value = strdup ((char *)(specification + pos));
+				int str_pos = 0;
+				while (true) {
+					if (specification[pos] == '\'' && specification[pos + 1] == '\'')
+					{
+						str_value[str_pos++] = '\'';
+						pos += 2;
+					}
+					else if (specification[pos] == '\'' && specification[pos + 1] != '\'')
+					{
+						str_value[str_pos++] = 0;
+						pos++;
+						m_value = str_value;
+						break;
+					}
+					else if (specification[pos])
+					{
+						str_value[str_pos++] = specification[pos++];
+					}
+					else
+						break;
+				}
 			}
 			else
 			{
