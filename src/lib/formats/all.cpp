@@ -1338,6 +1338,7 @@ void mame_formats_full_list(mame_formats_enumerator &en)
 #ifdef HAS_FORMATS_THOM_DSK
 	en.add(FLOPPY_THOMSON_525_FORMAT); // thom_dsk.h
 	en.add(FLOPPY_THOMSON_35_FORMAT); // thom_dsk.h
+	en.add(FLOPPY_THOMSON_SAP_FORMAT); // thom_dsk.h
 #endif
 
 	en.category("Texas Instruments");

@@ -59,8 +59,8 @@ void cd90_351_device::floppy_drives(device_slot_interface &device)
 
 void cd90_351_device::floppy_formats(format_registration &fr)
 {
-	fr.add_pc_formats();
 	fr.add(FLOPPY_THOMSON_35_FORMAT);
+	fr.add(FLOPPY_THOMSON_SAP_FORMAT);
 }
 
 void cd90_351_device::device_add_mconfig(machine_config &config)

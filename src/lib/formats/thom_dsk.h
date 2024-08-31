@@ -39,8 +39,25 @@ private:
   static const format formats[];
 };
 
+class thomson_sap_format : public thomson_35_format
+{
+public:
+  thomson_sap_format();
+
+  virtual int identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const override;
+  virtual bool load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image &image) const override;
+  virtual bool save(util::random_read_write &io, const std::vector<uint32_t> &variants, const floppy_image &image) const override;
+
+  virtual const char *name() const noexcept override;
+  virtual const char *description() const noexcept override;
+  virtual const char *extensions() const noexcept override;
+
+private:
+  static const format formats[];
+};
 
 extern const thomson_525_format FLOPPY_THOMSON_525_FORMAT;
 extern const thomson_35_format FLOPPY_THOMSON_35_FORMAT;
+extern const thomson_sap_format FLOPPY_THOMSON_SAP_FORMAT;
 
 #endif // MAME_FORMATS_THOM_DSK_H

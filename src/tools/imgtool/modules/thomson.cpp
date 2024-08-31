@@ -360,27 +360,30 @@ static void thom_close_fd_qd(imgtool::image &img)
 /* SAP format, Copyright 1998 by Alexandre Pukall
 
    image is composed of:
-   - byte 0:        version (0 or 1)
+   - byte 0:        format
+                      1 3"1/2 double density
+                      2 5"1/4 low density
    - bytes 1..65:   signature
    - bytes 66..end: sectors
 
    each sector is composed of
    - a 4-byte header:
-     . byte 0:     format
-                      0 3"1/2 double density
-                      1 5"1/4 low density
-     . byte 1:     protection (?)
+     . byte 0:     format (0 for well formed sector)
+     . byte 1:     protection (0 for unprotected sector)
      . byte 2:     track index, in 0..79
      . byte 3:     sector index, in 1..16
    - sector data, XOR 0xB3
    - 2-byte CRC of header + data, high byte first
+
+   data are stored sequentialy on disk by their track and sector
+   number
 
    there is no provision for two-sided images in sap
  */
 
 static const int sap_magic_num = 0xB3; /* simple XOR crypt */
 
-static const char sap_header[]=
+static char sap_header[]=
 	"\001SYSTEME D'ARCHIVAGE PUKALL S.A.P. "
 	"(c) Alexandre PUKALL Avril 1998";
 
@@ -414,23 +417,19 @@ static imgtoolerr_t thom_open_sap(imgtool::image &img, imgtool::stream::ptr &&st
 	if ( memcmp( buf+1, sap_header+1, 65 ) ) return IMGTOOLERR_CORRUPTIMAGE;
 
 	/* guess format */
-	f->stream->read(buf, 1 );
 	switch ( buf[0] )
 	{
 	case 1:
-	case 3:
-		f->heads = 1;
-		f->tracks = 40;
-		f->sector_size = 128;
-		f->sectuse_size = 128;
-		break;
-	case 0:
-	case 2:
-	case 4:
 		f->heads = 1;
 		f->tracks = 80;
 		f->sector_size = 256;
 		f->sectuse_size = 255;
+		break;
+	case 2:
+		f->heads = 1;
+		f->tracks = 40;
+		f->sector_size = 128;
+		f->sectuse_size = 128;
 		break;
 	default:
 		return IMGTOOLERR_CORRUPTIMAGE;
@@ -479,6 +478,7 @@ static void thom_close_sap(imgtool::image &img)
 	f->stream->seek(0, SEEK_SET);
 
 	/* image header */
+	*sap_header = (f->tracks == 80 ? 1 : 2);
 	if ( f->stream->write(sap_header, 66) < 66) {
 		/* logerror( "thom_diskimage_close_sap: write error\n" ); */
 		return;
@@ -487,7 +487,7 @@ static void thom_close_sap(imgtool::image &img)
 	for ( track = 0; track < f->tracks; track++ )
 		for ( sector = 1; sector <= 16; sector++ ) {
 	/* sector header & data */
-	buf[0] = ( f->tracks == 80 ) ? 2 : 1;
+	buf[0] = 0;
 	buf[1] = 0;
 	buf[2] = track;
 	buf[3] = sector;
@@ -1267,6 +1267,38 @@ static imgtoolerr_t thom_create(imgtool::image &img,
 
 	f->stream = stream.release();
 	return IMGTOOLERR_SUCCESS;
+}
+
+static imgtoolerr_t thom_sap_create(imgtool::image &img,
+				imgtool::stream::ptr &&stream,
+				util::option_resolution *opts)
+{
+	thom_floppy* f = get_thom_floppy(img);
+
+	/* get parameters */
+	f->tracks = opts->lookup_int('T');
+	switch ( opts->lookup_int('D') ) {
+	case 0: f->sector_size = 128; f->sectuse_size = 128; break;
+	case 1: f->sector_size = 256; f->sectuse_size = 255; break;
+	}
+
+	/* sanity checks */
+	switch ( f->tracks ) {
+	case 40:
+		if ( f->sector_size != 128 ) {
+			util::stream_format(std::wcerr, L"thom_sap_create: SAP format cannot have 40 tracks in double density\n");
+			return IMGTOOLERR_PARAMCORRUPT;
+		}
+		break;
+	case 80: if ( f->sector_size != 256 ) {
+			util::stream_format(std::wcerr, L"thom_sap_create: SAP format cannot have 80 tracks in single density\n");
+			return IMGTOOLERR_PARAMCORRUPT;
+		}
+		break;
+	default: return IMGTOOLERR_PARAMCORRUPT;
+	}
+
+        return thom_create(img, std::move(stream), opts);
 }
 
 
@@ -2155,6 +2187,8 @@ void thom_sap_basic_get_info(const imgtool_class *clas,
 		break;
 	case IMGTOOLINFO_STR_FILE_EXTENSIONS:
 		strcpy( info->s = imgtool_temp_str(), "sap" ); break;
+	case IMGTOOLINFO_PTR_CREATE:
+		info->create = thom_sap_create; break;
 	case IMGTOOLINFO_PTR_OPEN:
 		info->open = thom_open_sap; break;
 	case IMGTOOLINFO_PTR_CLOSE:
