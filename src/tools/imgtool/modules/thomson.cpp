@@ -285,18 +285,18 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	case 327680:
-		// floppy_image::FF_35, floppy_image::SSDD
-		f->tracks = 80;
-		f->sector_size = 256;
-		f->sectuse_size = 255;
-		f->heads = 1;
-		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
-
 		// floppy_image::FF_525, floppy_image::DSDD
 		f->tracks = 40;
 		f->sector_size = 256;
 		f->sectuse_size = 255;
 		f->heads = 2;
+		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+
+		// floppy_image::FF_35, floppy_image::SSDD
+		f->tracks = 80;
+		f->sector_size = 256;
+		f->sectuse_size = 255;
+		f->heads = 1;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
 		return IMGTOOLERR_CORRUPTIMAGE;
