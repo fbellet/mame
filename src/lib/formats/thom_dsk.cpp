@@ -154,7 +154,7 @@ struct sap_header
 	uint8_t signature[65];
 };
 
-thomson_sap_format::thomson_sap_format() : thomson_35_fd_format()
+thomson_sap_format::thomson_sap_format() : wd177x_format(formats)
 {
 }
 

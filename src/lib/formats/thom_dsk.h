@@ -39,7 +39,7 @@ private:
   static const format formats[];
 };
 
-class thomson_sap_format : public thomson_35_fd_format
+class thomson_sap_format : public wd177x_format
 {
 public:
   thomson_sap_format();
