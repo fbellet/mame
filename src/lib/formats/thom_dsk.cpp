@@ -9,31 +9,31 @@
 #define __EMU_H__ // logmacro wasn't really intended to be used outside stuff that uses libemu
 #include "../emu/logmacro.h"
 
-thomson_525_format::thomson_525_format() : wd177x_format(formats)
+thomson_525_fd_format::thomson_525_fd_format() : wd177x_format(formats)
 {
 }
 
-const char *thomson_525_format::name() const noexcept
+const char *thomson_525_fd_format::name() const noexcept
 {
-	return "thomson_525";
+	return "thomson_525_fd";
 }
 
-const char *thomson_525_format::description() const noexcept
+const char *thomson_525_fd_format::description() const noexcept
 {
-	return "Thomson 5.25 disk image";
+	return "Thomson 5.25 FD disk image";
 }
 
-const char *thomson_525_format::extensions() const noexcept
+const char *thomson_525_fd_format::extensions() const noexcept
 {
 	return "fd";
 }
 
-int thomson_525_format::get_image_offset(const format &f, int head, int track) const
+int thomson_525_fd_format::get_image_offset(const format &f, int head, int track) const
 {
 	return (f.track_count * head + track) * compute_track_size(f);
 }
 
-const thomson_525_format::format thomson_525_format::formats[] = {
+const thomson_525_fd_format::format thomson_525_fd_format::formats[] = {
 	{
 		floppy_image::FF_525, floppy_image::DSDD, floppy_image::MFM,
 		2000,
@@ -62,31 +62,31 @@ const thomson_525_format::format thomson_525_format::formats[] = {
 };
 
 
-thomson_35_format::thomson_35_format() : wd177x_format(formats)
+thomson_35_fd_format::thomson_35_fd_format() : wd177x_format(formats)
 {
 }
 
-const char *thomson_35_format::name() const noexcept
+const char *thomson_35_fd_format::name() const noexcept
 {
-	return "thomson_35";
+	return "thomson_35_fd";
 }
 
-const char *thomson_35_format::description() const noexcept
+const char *thomson_35_fd_format::description() const noexcept
 {
-	return "Thomson 3.5 disk image";
+	return "Thomson 3.5 FD disk image";
 }
 
-const char *thomson_35_format::extensions() const noexcept
+const char *thomson_35_fd_format::extensions() const noexcept
 {
 	return "fd";
 }
 
-int thomson_35_format::get_image_offset(const format &f, int head, int track) const
+int thomson_35_fd_format::get_image_offset(const format &f, int head, int track) const
 {
 	return (f.track_count * head + track) * compute_track_size(f);
 }
 
-const thomson_35_format::format thomson_35_format::formats[] = {
+const thomson_35_fd_format::format thomson_35_fd_format::formats[] = {
 	{
 		floppy_image::FF_35, floppy_image::DSDD, floppy_image::MFM,
 		2000,
@@ -114,7 +114,7 @@ const thomson_35_format::format thomson_35_format::formats[] = {
 	{}
 };
 
-floppy_image_format_t::desc_e* thomson_35_format::get_desc_fm(const format &f, int &current_size, int &end_gap_index) const
+floppy_image_format_t::desc_e* thomson_35_fd_format::get_desc_fm(const format &f, int &current_size, int &end_gap_index) const
 {
 	// The format description differs from the wd177x format:
 	// the head id is always zero (in field 7)
@@ -154,7 +154,7 @@ floppy_image_format_t::desc_e* thomson_35_format::get_desc_fm(const format &f, i
 	return desc;
 }
 
-floppy_image_format_t::desc_e* thomson_35_format::get_desc_mfm(const format &f, int &current_size, int &end_gap_index) const
+floppy_image_format_t::desc_e* thomson_35_fd_format::get_desc_mfm(const format &f, int &current_size, int &end_gap_index) const
 {
 	// The format description differs from the wd177x format:
 	// the head id is always zero (in field 7)
@@ -209,7 +209,7 @@ struct sap_header
 	uint8_t signature[65];
 };
 
-thomson_sap_format::thomson_sap_format() : thomson_35_format()
+thomson_sap_format::thomson_sap_format() : thomson_35_fd_format()
 {
 }
 
@@ -441,6 +441,6 @@ bool thomson_sap_format::save(util::random_read_write &io, const std::vector<uin
 	return true;
 }
 
-const thomson_525_format FLOPPY_THOMSON_525_FORMAT;
-const thomson_35_format FLOPPY_THOMSON_35_FORMAT;
+const thomson_525_fd_format FLOPPY_THOMSON_525_FD_FORMAT;
+const thomson_35_fd_format FLOPPY_THOMSON_35_FD_FORMAT;
 const thomson_sap_format FLOPPY_THOMSON_SAP_FORMAT;

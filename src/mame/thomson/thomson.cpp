@@ -1164,7 +1164,7 @@ INPUT_PORTS_END
 
 static void wd2793_formats(format_registration &fr)
 {
-	fr.add(FLOPPY_THOMSON_35_FORMAT);
+	fr.add(FLOPPY_THOMSON_35_FD_FORMAT);
 	fr.add(FLOPPY_THOMSON_SAP_FORMAT);
 }
 
@@ -1388,7 +1388,7 @@ INPUT_PORTS_END
 
 static void thmfc1_formats(format_registration &fr)
 {
-	fr.add(FLOPPY_THOMSON_35_FORMAT);
+	fr.add(FLOPPY_THOMSON_35_FD_FORMAT);
 	fr.add(FLOPPY_THOMSON_SAP_FORMAT);
 }
 
