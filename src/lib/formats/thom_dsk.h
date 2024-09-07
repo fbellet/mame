@@ -7,10 +7,10 @@
 
 #include "wd177x_dsk.h"
 
-class thomson_525_format : public wd177x_format
+class thomson_525_fd_format : public wd177x_format
 {
 public:
-  thomson_525_format();
+  thomson_525_fd_format();
 
   virtual const char *name() const noexcept override;
   virtual const char *description() const noexcept override;
@@ -22,10 +22,10 @@ private:
   static const format formats[];
 };
 
-class thomson_35_format : public wd177x_format
+class thomson_35_fd_format : public wd177x_format
 {
 public:
-  thomson_35_format();
+  thomson_35_fd_format();
 
   virtual const char *name() const noexcept override;
   virtual const char *description() const noexcept override;
@@ -39,7 +39,7 @@ private:
   static const format formats[];
 };
 
-class thomson_sap_format : public thomson_35_format
+class thomson_sap_format : public thomson_35_fd_format
 {
 public:
   thomson_sap_format();
@@ -56,8 +56,8 @@ private:
   static const format formats[];
 };
 
-extern const thomson_525_format FLOPPY_THOMSON_525_FORMAT;
-extern const thomson_35_format FLOPPY_THOMSON_35_FORMAT;
+extern const thomson_525_fd_format FLOPPY_THOMSON_525_FD_FORMAT;
+extern const thomson_35_fd_format FLOPPY_THOMSON_35_FD_FORMAT;
 extern const thomson_sap_format FLOPPY_THOMSON_SAP_FORMAT;
 
 #endif // MAME_FORMATS_THOM_DSK_H

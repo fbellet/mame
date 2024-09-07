@@ -50,7 +50,7 @@ void cd90_640_device::floppy_drives(device_slot_interface &device)
 
 void cd90_640_device::floppy_formats(format_registration &fr)
 {
-	fr.add(FLOPPY_THOMSON_525_FORMAT);
+	fr.add(FLOPPY_THOMSON_525_FD_FORMAT);
 	fr.add(FLOPPY_THOMSON_SAP_FORMAT);
 }
 
