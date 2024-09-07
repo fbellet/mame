@@ -38,7 +38,7 @@ private:
   virtual int get_image_offset(const format &f, int head, int track) const override;
 };
 
-class thomson_sap_format : public thomson_35_fd_format
+class thomson_sap_format : public wd177x_format
 {
 public:
   thomson_sap_format();
