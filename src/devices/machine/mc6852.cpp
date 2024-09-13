@@ -24,7 +24,7 @@
 #include "emu.h"
 #include "mc6852.h"
 
-//#define VERBOSE 1
+#define VERBOSE 1
 #include "logmacro.h"
 
 
@@ -229,6 +229,11 @@ uint8_t mc6852_device::read(offs_t offset)
 			data &= ~S_TDRA;
 		}
 
+		// IRQ update
+		data |= ((m_cr[0] & C1_RIE) && (data & S_RDA) ? S_IRQ : 0);
+		data |= ((m_cr[0] & C1_TIE) && (data & S_TDRA) ? S_IRQ : 0);
+		data |= ((m_cr[1] & C2_EIE) && (data & ~(S_IRQ | S_TDRA | S_RDA)) ? S_IRQ : 0);
+
 		if (!machine().side_effects_disabled())
 		{
 			// TODO this might not be quite right, the datasheet
@@ -313,7 +318,7 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 			parity_t parity = PARITY_NONE;
 			stop_bits_t stop_bits = STOP_BITS_1;
 
-			switch (data & C2_WS_MASK)
+			switch ((data & C2_WS_MASK) >> 3)
 			{
 			case 0: data_bit_count = 6; parity = PARITY_EVEN; break;
 			case 1: data_bit_count = 6; parity = PARITY_ODD; break;
@@ -410,6 +415,8 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 			m_rx_fifo = std::queue<uint8_t>();
 
 			receive_register_reset();
+
+			data = data & C1_RX_RS & m_cr[0];
 		}
 
 		/* transmitter reset */
@@ -428,6 +435,8 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 			m_tx_fifo = std::queue<uint8_t>();
 
 			transmit_register_reset();
+
+			data = data & C1_TX_RS & m_cr[0];
 		}
 
 		if (data & C1_STRIP_SYNC)

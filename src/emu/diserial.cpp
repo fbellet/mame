@@ -13,7 +13,7 @@
 #define LOG_SETUP  (1U << 1)
 #define LOG_TX     (1U << 2)
 #define LOG_RX     (1U << 3)
-#define VERBOSE    (0)
+#define VERBOSE    (LOG_SETUP|LOG_TX|LOG_RX)
 
 #define LOG_OUTPUT_FUNC device().logerror
 #include "logmacro.h"

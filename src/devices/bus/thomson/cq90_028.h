@@ -3,13 +3,14 @@
 
 // CQ 90-028 - QDD drive controller built from a motorola 6852 (serial chip)
 //
-// Handles n? QDD drives (QD 90-128)
+// Handles a single QDD drive (QD 90-128)
 
 #ifndef MAME_BUS_THOMSON_CQ90_028_H
 #define MAME_BUS_THOMSON_CQ90_028_H
 
 #include "extension.h"
 #include "machine/mc6852.h"
+#include "imagedev/thomson_qdd.h"
 
 class cq90_028_device : public device_t, public thomson_extension_interface
 {
@@ -29,7 +30,8 @@ protected:
 	virtual void device_reset() override ATTR_COLD;
 
 private:
-	required_device<mc6852_device> m_serial;
+	required_device<mc6852_device> m_ssda;
+	required_device<thomson_qdd_image_device> m_qdd;
 	required_memory_region m_rom;
 
 	void drive_w(u8 data);
