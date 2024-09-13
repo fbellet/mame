@@ -3,10 +3,7 @@
 
 // CQ 90-028 - QDD drive controller built from a motorola 6852 (serial chip)
 //
-// Handles n? QDD drives (QD 90-128)
-
-// Nonfunctional, essentially because we have no container for the QDD
-// (it's not a floppy, the closest equivalent would be a digital tape)
+// Handles a single QDD drive (QD 90-128)
 
 #include "emu.h"
 #include "cq90_028.h"
@@ -16,7 +13,8 @@ DEFINE_DEVICE_TYPE(CQ90_028, cq90_028_device, "cq90_028", "Thomson CQ 90-028 QDD
 cq90_028_device::cq90_028_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, CQ90_028, tag, owner, clock),
 	thomson_extension_interface(mconfig, *this),
-	m_serial(*this, "serial"),
+	m_ssda(*this, "serial"),
+	m_qdd(*this, "qdd"),
 	m_rom(*this, "rom")
 {
 }
@@ -33,7 +31,7 @@ void cq90_028_device::rom_map(address_map &map)
 
 void cq90_028_device::io_map(address_map &map)
 {
-	map(0x10, 0x11).rw(m_serial, FUNC(mc6852_device::read), FUNC(mc6852_device::write));
+	map(0x10, 0x11).rw(m_ssda, FUNC(mc6852_device::read), FUNC(mc6852_device::write));
 	map(0x18, 0x18).rw(FUNC(cq90_028_device::status_r), FUNC(cq90_028_device::drive_w));
 	map(0x1c, 0x1c).w(FUNC(cq90_028_device::motor_w));
 }
@@ -45,9 +43,10 @@ const tiny_rom_entry *cq90_028_device::device_rom_region() const
 
 void cq90_028_device::device_add_mconfig(machine_config &config)
 {
-	MC6852(config, m_serial, DERIVED_CLOCK(1, 1)); // Comes from the main board
+	MC6852(config, m_ssda, DERIVED_CLOCK(1, 1)); // Comes from the main board
 	// Base tx/rx clock is 101564Hz
 	// There's probably a pll in the gate array
+	THOMSON_QDD(config, m_qdd);
 }
 
 void cq90_028_device::device_start()
@@ -56,6 +55,8 @@ void cq90_028_device::device_start()
 
 void cq90_028_device::device_reset()
 {
+	m_ssda->reset();
+	m_qdd->set_serial(m_ssda);
 }
 
 void cq90_028_device::drive_w(u8 data)
@@ -72,5 +73,11 @@ u8 cq90_028_device::status_r()
 {
 	// 40 = disk absent
 	// 80 = index pulse
-	return 0x40;
+	u8 data =  (m_qdd->disk_present() ? 0 : 0x40) | (m_qdd->index() ? 0x80 : 0);
+	static u8 prev;
+	if (data != prev) {
+		prev = data;
+		logerror("status_r %02x\n", data);
+	}
+	return data;
 }
