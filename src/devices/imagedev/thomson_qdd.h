@@ -43,7 +43,7 @@ public:
 
         bool disk_present() { return m_disk_present; }
         bool index() { return m_index; }
-        void set_serial(mc6852_device *data) { m_ssda = data; }
+        void set_ssda(mc6852_device *data) { m_ssda = data; }
 
 protected:
 	// device_t implementation
