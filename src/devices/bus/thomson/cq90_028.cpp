@@ -13,7 +13,7 @@ DEFINE_DEVICE_TYPE(CQ90_028, cq90_028_device, "cq90_028", "Thomson CQ 90-028 QDD
 cq90_028_device::cq90_028_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, CQ90_028, tag, owner, clock),
 	thomson_extension_interface(mconfig, *this),
-	m_ssda(*this, "serial"),
+	m_ssda(*this, "ssda"),
 	m_qdd(*this, "qdd"),
 	m_rom(*this, "rom")
 {
@@ -56,7 +56,8 @@ void cq90_028_device::device_start()
 void cq90_028_device::device_reset()
 {
 	m_ssda->reset();
-	m_qdd->set_serial(m_ssda);
+	m_ssda->set_data_bus_reversed(true);
+	m_qdd->set_ssda(m_ssda);
 }
 
 void cq90_028_device::drive_w(u8 data)

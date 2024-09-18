@@ -47,6 +47,8 @@ public:
 	void set_rx_clock(int clock) { m_rx_clock = clock; }
 	void set_tx_clock(int clock) { m_tx_clock = clock; }
 
+	void set_data_bus_reversed(bool state) { m_data_bus_reversed = state; };
+
 	auto tx_data_callback() { return m_write_tx_data.bind(); }
 	auto irq_callback() { return m_write_irq.bind(); }
 	auto sm_dtr_callback() { return m_write_sm_dtr.bind(); }
@@ -154,6 +156,7 @@ private:
 	int m_sm_dtr;           // sync match/data terminal ready
 	int m_tuf;              // transmitter underflow
 	int m_in_sync;
+	bool m_data_bus_reversed;
 };
 
 

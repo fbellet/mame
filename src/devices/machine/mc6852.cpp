@@ -34,6 +34,15 @@
 
 DEFINE_DEVICE_TYPE(MC6852, mc6852_device, "mc6852", "Motorola MC6852 SSDA")
 
+#define REVERSE_BYTE(a) \
+	(((a) & 0x80 ? 0x01 : 0) | \
+	((a) & 0x40 ? 0x02 : 0) | \
+	((a) & 0x20 ? 0x04 : 0) | \
+	((a) & 0x10 ? 0x08 : 0) | \
+	((a) & 0x08 ? 0x10 : 0) | \
+	((a) & 0x04 ? 0x20 : 0) | \
+	((a) & 0x02 ? 0x40 : 0) | \
+	((a) & 0x01 ? 0x80 : 0))
 
 
 //**************************************************************************
@@ -57,7 +66,8 @@ mc6852_device::mc6852_device(const machine_config &mconfig, const char *tag, dev
 	m_dcd(1),
 	m_sm_dtr(0),
 	m_tuf(0),
-	m_in_sync(0)
+	m_in_sync(0),
+	m_data_bus_reversed(false)
 {
 }
 
@@ -84,6 +94,7 @@ void mc6852_device::device_start()
 	save_item(NAME(m_sm_dtr));
 	save_item(NAME(m_tuf));
 	save_item(NAME(m_in_sync));
+	save_item(NAME(m_data_bus_reversed));
 }
 
 
@@ -156,6 +167,7 @@ void mc6852_device::receive_byte(uint8_t data)
 
 	if (size < 3)
 	{
+		LOG("MC6852 Push byte 0x%02x to FIFO\n", data);
 		m_rx_fifo.push(data);
 		size++;
 	}
@@ -211,6 +223,7 @@ uint8_t mc6852_device::read(offs_t offset)
 				{
 					m_status &= ~S_RDA;
 				}
+				LOG("MC6852 Receive Data FIFO 0x%02x\n", data);
 			}
 		}
 	}
@@ -229,10 +242,15 @@ uint8_t mc6852_device::read(offs_t offset)
 			data &= ~S_TDRA;
 		}
 
-		// IRQ update
-		data |= ((m_cr[0] & C1_RIE) && (data & S_RDA) ? S_IRQ : 0);
-		data |= ((m_cr[0] & C1_TIE) && (data & S_TDRA) ? S_IRQ : 0);
-		data |= ((m_cr[1] & C2_EIE) && (data & ~(S_IRQ | S_TDRA | S_RDA)) ? S_IRQ : 0);
+		LOG("MC6852 Status 0x%02x irq=%i pe=%i ovr=%i und=%i cts=%i tr=%i rd=%i\n",
+				m_status,
+				m_status & S_IRQ  ? 1 : 0,
+				m_status & S_PE   ? 1 : 0,
+				m_status & S_RX_OVRN  ? 1 : 0,
+				m_status & S_TUF  ? 1 : 0,
+				m_status & S_CTS ? 1 : 0,
+				m_status & S_TDRA ? 1 : 0,
+				m_status & S_RDA  ? 1 : 0);
 
 		if (!machine().side_effects_disabled())
 		{
@@ -241,6 +259,9 @@ uint8_t mc6852_device::read(offs_t offset)
 			// reading the status, and the RX data fifo?
 			m_status &= S_RX_OVRN;
 		}
+
+		if (m_data_bus_reversed)
+			data = REVERSE_BYTE(data);
 	}
 
 	return data;
@@ -310,8 +331,19 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 		switch (m_cr[0] & C1_AC_MASK)
 		{
 		case C1_AC_C2: {
+			if (m_data_bus_reversed)
+				data = REVERSE_BYTE(data);
 			/* control 2 */
-			LOG("MC6852 Control 2 %02x\n", data);
+			static const int bit[8] = { 6, 6, 7, 8, 7, 7, 8, 8 };
+			static const int par[8] = { 2, 1, 0, 0, 2, 1, 2, 1 };
+			static const char *const parname[3] = { "none", "odd", "even" };
+			int bits   = bit[ (data >> 3) & 7 ];
+			int parval = par[ (data >> 3) & 7 ];
+
+			LOG("MC6852 Control 2 0x%02x bits=%i par=%s blen=%i under=%s%s\n", data,
+					bits, parname[ parval ], data & C2_1_2_BYTE ? 1 : 2,
+					data & C2_TX_SYNC ? "sync" : "ff",
+					data & C2_EIE ? "irq-err" : "" );
 			m_cr[1] = data;
 
 			int data_bit_count = 0;
@@ -353,7 +385,14 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 
 		case C1_AC_C3:
 			/* control 3 */
-			LOG("MC6852 Control 3 %02x\n", data);
+			if (m_data_bus_reversed)
+				data = REVERSE_BYTE(data);
+			LOG("MC6852 Control 3 0x%02x %s%ssync-len=%i sync-mode=%s\n",
+					data,
+					data & C3_CTUF ? "clr-tuf " : "",
+					data & C3_CTS ? "clr-cts " : "",
+					data & C3_1_2_SYNC ? 1 : 2,
+					data & C3_E_I_SYNC ? "ext" : "int" );
 			m_cr[2] = data;
 			if (m_cr[2] & C3_CTUF)
 			{
@@ -369,7 +408,7 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 
 		case C1_AC_SYNC:
 			/* sync code */
-			LOG("MC6852 Sync Code %02x\n", data);
+			LOG("MC6852 Sync Code 0x%02x\n", data);
 			m_scr = data;
 			break;
 
@@ -378,13 +417,13 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 			int available = 3 - m_tx_fifo.size();
 			if (available > 0)
 			{
-				LOG("MC6852 Transmit FIFO %02x\n", data);
+				LOG("MC6852 Transmit FIFO 0x%02x\n", data);
 				m_tx_fifo.push(data);
 				available--;
 			}
 			else
 			{
-				LOG("MC6852 Transmit FIFO OVERFLOW %02x\n", data);
+				LOG("MC6852 Transmit FIFO OVERFLOW 0x%02x\n", data);
 			}
 			int trigger = (m_cr[1] & C2_1_2_BYTE) ? 1 : 2;
 			if (available < trigger)
@@ -397,7 +436,14 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 	}
 	else
 	{
-		LOG("MC6852 Control 1 %02x\n", data);
+		if (m_data_bus_reversed)
+			data = REVERSE_BYTE(data);
+		LOG("MC6852 Control 1 0x%02x reset=%c%c %s%sirq=%c%c\n", data,
+				data & C1_RX_RS ? 'r' : '-', data & C1_TX_RS ? 't' : '-',
+				data & C1_STRIP_SYNC ? "strip-sync " : "",
+				data & C1_CLEAR_SYNC ? "clear-sync " : "",
+				data & C1_RIE ? 'r' : '-',
+				data & C1_TIE ? 't' : '-');
 
 		/* receiver reset */
 		if (data & C1_RX_RS)
@@ -408,15 +454,11 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 			Register is set to ones.
 			*/
 
-			LOG("MC6852 Receiver Reset\n");
-
 			m_status &= ~(S_RX_OVRN | S_PE | S_DCD | S_RDA);
 			m_rsr = 0xff;
 			m_rx_fifo = std::queue<uint8_t>();
 
 			receive_register_reset();
-
-			data = data & C1_RX_RS & m_cr[0];
 		}
 
 		/* transmitter reset */
@@ -428,25 +470,15 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 			// after one E clock pulse), the Transmitter Underflow
 			// status bit, and the CTS interrupt.
 
-			LOG("MC6852 Transmitter Reset\n");
-
 			m_status &= ~(S_TUF | S_CTS);
 			m_status |= S_TDRA;
 			m_tx_fifo = std::queue<uint8_t>();
 
 			transmit_register_reset();
-
-			data = data & C1_TX_RS & m_cr[0];
 		}
-
-		if (data & C1_STRIP_SYNC)
-			LOG("MC6852 Strip Synchronization Characters\n");
 
 		if (data & C1_CLEAR_SYNC)
-		{
-			LOG("MC6852 Clear Synchronization\n");
 			m_in_sync = 0;
-		}
 
 		m_cr[0] = data;
 	}

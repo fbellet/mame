@@ -20,7 +20,7 @@
 #define QDD_SECTOR_COUNT            400
 #define QDD_SECTOR_LENGTH           128
 #define QDD_IMAGE_LENGTH            (QDD_SECTOR_COUNT * QDD_SECTOR_LENGTH)
-#define QDD_TRACK_LENGTH	    810536
+#define QDD_TRACK_LENGTH	    101317
 
 #define QDD_BITRATE                 101265
 
@@ -110,14 +110,18 @@ TIMER_CALLBACK_MEMBER(thomson_qdd_image_device::bit_timer)
 	{
 		m_bit_offset = 0;
 		m_index = (m_byte_offset < 13); // 1ms
-		if (m_ssda)
+		if (m_ssda) {
+			logerror("Sent 0x%02x [%d/%d] to the SSDA\n",
+					m_track_buffer[m_byte_offset],
+					m_byte_offset, QDD_TRACK_LENGTH);
 			m_ssda->receive_byte(m_track_buffer[m_byte_offset]);
+		}
 		m_byte_offset++;
 
-		if (m_byte_offset == QDD_IMAGE_LENGTH)
+		if (m_byte_offset == QDD_TRACK_LENGTH)
 		{
 			m_byte_offset = 0;
-			logerror("bit_timer track completed\n");
+			logerror("Track completed, restarting\n");
 		}
 	}
 }
