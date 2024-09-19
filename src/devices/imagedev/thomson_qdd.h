@@ -41,9 +41,10 @@ public:
 	virtual const char *image_interface() const noexcept override { return "qdd"; }
 	virtual const char *file_extensions() const noexcept override { return "qd"; }
 
-        bool disk_present() { return m_disk_present; }
-        bool index() { return m_index; }
-        void set_ssda(mc6852_device *data) { m_ssda = data; }
+	bool disk_present() { return m_disk_present; }
+	bool index() { return m_index; }
+	void set_ssda(mc6852_device *ssda) { m_ssda = ssda; }
+	void set_write_enable(bool value) { m_write_enable = value; }
 
 protected:
 	// device_t implementation
@@ -56,10 +57,11 @@ private:
 
 	int m_bit_offset;
 	int m_byte_offset;
-        bool m_disk_present;
-        bool m_index;
+	bool m_disk_present;
+	bool m_index;
+	bool m_write_enable;
 
-        mc6852_device *m_ssda;
+	mc6852_device *m_ssda;
 	emu_timer *m_bit_timer;
 };
 

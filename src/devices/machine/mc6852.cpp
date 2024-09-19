@@ -24,8 +24,21 @@
 #include "emu.h"
 #include "mc6852.h"
 
-#define VERBOSE 1
+#define LOG_CTRL	(1U << 1) // Show Control Registers operations
+#define LOG_STAT	(1U << 2) // Show Status Register queries
+#define LOG_TX		(1U << 3) // Show Tx-FIFO operations
+#define LOG_RX		(1U << 4) // Show Rx-FIFO operations
+#define LOG_SYNC	(1U << 5) // Show Sync Code value
+
+// #define VERBOSE (LOG_STAT|LOG_SYNC|LOG_TX)
+
 #include "logmacro.h"
+
+#define LOGCTRL(...)	LOGMASKED(LOG_CTRL, __VA_ARGS__)
+#define LOGSTAT(...)	LOGMASKED(LOG_STAT, __VA_ARGS__)
+#define LOGTX(...)	LOGMASKED(LOG_TX, __VA_ARGS__)
+#define LOGRX(...)	LOGMASKED(LOG_RX, __VA_ARGS__)
+#define LOGSYNC(...)	LOGMASKED(LOG_SYNC, __VA_ARGS__)
 
 
 //**************************************************************************
@@ -167,7 +180,7 @@ void mc6852_device::receive_byte(uint8_t data)
 
 	if (size < 3)
 	{
-		LOG("MC6852 Push byte 0x%02x to FIFO\n", data);
+		LOGRX("MC6852 Push byte 0x%02x to FIFO\n", data);
 		m_rx_fifo.push(data);
 		size++;
 	}
@@ -223,7 +236,7 @@ uint8_t mc6852_device::read(offs_t offset)
 				{
 					m_status &= ~S_RDA;
 				}
-				LOG("MC6852 Receive Data FIFO 0x%02x\n", data);
+				LOGRX("MC6852 Receive Data FIFO 0x%02x\n", data);
 			}
 		}
 	}
@@ -242,15 +255,20 @@ uint8_t mc6852_device::read(offs_t offset)
 			data &= ~S_TDRA;
 		}
 
-		LOG("MC6852 Status 0x%02x irq=%i pe=%i ovr=%i und=%i cts=%i tr=%i rd=%i\n",
-				m_status,
-				m_status & S_IRQ  ? 1 : 0,
-				m_status & S_PE   ? 1 : 0,
-				m_status & S_RX_OVRN  ? 1 : 0,
-				m_status & S_TUF  ? 1 : 0,
-				m_status & S_CTS ? 1 : 0,
-				m_status & S_TDRA ? 1 : 0,
-				m_status & S_RDA  ? 1 : 0);
+		static uint8_t prev_data;
+
+		if (data != prev_data) {
+			LOGSTAT("MC6852 Status 0x%02x irq=%i pe=%i ovr=%i und=%i cts=%i tr=%i rd=%i\n",
+					data,
+					data & S_IRQ  ? 1 : 0,
+					data & S_PE   ? 1 : 0,
+					data & S_RX_OVRN  ? 1 : 0,
+					data & S_TUF  ? 1 : 0,
+					data & S_CTS ? 1 : 0,
+					data & S_TDRA ? 1 : 0,
+					data & S_RDA  ? 1 : 0);
+			prev_data = data;
+		}
 
 		if (!machine().side_effects_disabled())
 		{
@@ -340,7 +358,7 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 			int bits   = bit[ (data >> 3) & 7 ];
 			int parval = par[ (data >> 3) & 7 ];
 
-			LOG("MC6852 Control 2 0x%02x bits=%i par=%s blen=%i under=%s%s\n", data,
+			LOGCTRL("MC6852 Control 2 0x%02x bits=%i par=%s blen=%i under=%s%s\n", data,
 					bits, parname[ parval ], data & C2_1_2_BYTE ? 1 : 2,
 					data & C2_TX_SYNC ? "sync" : "ff",
 					data & C2_EIE ? "irq-err" : "" );
@@ -387,7 +405,7 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 			/* control 3 */
 			if (m_data_bus_reversed)
 				data = REVERSE_BYTE(data);
-			LOG("MC6852 Control 3 0x%02x %s%ssync-len=%i sync-mode=%s\n",
+			LOGCTRL("MC6852 Control 3 0x%02x %s%ssync-len=%i sync-mode=%s\n",
 					data,
 					data & C3_CTUF ? "clr-tuf " : "",
 					data & C3_CTS ? "clr-cts " : "",
@@ -408,7 +426,7 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 
 		case C1_AC_SYNC:
 			/* sync code */
-			LOG("MC6852 Sync Code 0x%02x\n", data);
+			LOGSYNC("MC6852 Sync Code 0x%02x\n", data);
 			m_scr = data;
 			break;
 
@@ -417,13 +435,13 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 			int available = 3 - m_tx_fifo.size();
 			if (available > 0)
 			{
-				LOG("MC6852 Transmit FIFO 0x%02x\n", data);
+				LOGTX("MC6852 Transmit FIFO 0x%02x\n", data);
 				m_tx_fifo.push(data);
 				available--;
 			}
 			else
 			{
-				LOG("MC6852 Transmit FIFO OVERFLOW 0x%02x\n", data);
+				LOGTX("MC6852 Transmit FIFO OVERFLOW 0x%02x\n", data);
 			}
 			int trigger = (m_cr[1] & C2_1_2_BYTE) ? 1 : 2;
 			if (available < trigger)
@@ -438,7 +456,7 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 	{
 		if (m_data_bus_reversed)
 			data = REVERSE_BYTE(data);
-		LOG("MC6852 Control 1 0x%02x reset=%c%c %s%sirq=%c%c\n", data,
+		LOGCTRL("MC6852 Control 1 0x%02x reset=%c%c %s%sirq=%c%c\n", data,
 				data & C1_RX_RS ? 'r' : '-', data & C1_TX_RS ? 't' : '-',
 				data & C1_STRIP_SYNC ? "strip-sync " : "",
 				data & C1_CLEAR_SYNC ? "clear-sync " : "",
