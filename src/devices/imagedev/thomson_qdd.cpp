@@ -61,6 +61,26 @@ void thomson_qdd_image_device::device_start()
 	m_ssda = nullptr;
 }
 
+/* fixed interlacing map for QDDs */
+static int thomson_qdd_map[400];
+
+static void thomson_qdd_compute_map ( void )
+{
+	/* this map is hardcoded in the QDD BIOS */
+	static const int p[6][4] = {
+		{20,  2, 14, 8}, {21, 19, 13, 7},
+		{22, 18, 12, 6}, {23, 17, 11, 5},
+		{24, 16, 10, 4}, { 1, 15,  9, 3}};
+	static const int q[4] = {0, 8, 4, 12};
+	int t, s;
+
+	for (t = 0; t < 24; t++)
+		for (s = 0; s < 16; s++)
+			thomson_qdd_map[t*16 + s] = p[t/4][s%4]*16 + (s/4) + 4*(t%4);
+	for (s = 0; s < 16; s++)
+		thomson_qdd_map[24*16 + s] = q[s%4] + (s/4);
+}
+
 std::pair<std::error_condition, std::string> thomson_qdd_image_device::call_load()
 {
 	if (length() != QDD_IMAGE_LENGTH)
@@ -69,6 +89,8 @@ std::pair<std::error_condition, std::string> thomson_qdd_image_device::call_load
 	uint8_t *dst = &m_track_buffer[0];
 	uint8_t *org = dst;
 	memset(dst, 0x16, 2796); dst += 2796;
+	thomson_qdd_compute_map();
+
 	for (int i = 1; i <= 400; i++)
 	{
 		dst[0] = 0xa5;
@@ -78,7 +100,8 @@ std::pair<std::error_condition, std::string> thomson_qdd_image_device::call_load
 		dst += 4;
 		memset(dst, 0x16, 10); dst += 10;
 		dst[0] = 0x5a;
-		fread(&dst[1], 128);
+		fseek(QDD_SECTOR_LENGTH*thomson_qdd_map[i - 1], SEEK_SET);
+		fread(&dst[1], QDD_SECTOR_LENGTH);
 		uint8_t crc = 0;
 		for (int j = 0; j < 129; j++)
 		    crc += dst[j];
