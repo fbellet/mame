@@ -8,6 +8,9 @@
 #include "emu.h"
 #include "cq90_028.h"
 
+#define VERBOSE 0
+#include "logmacro.h"
+
 DEFINE_DEVICE_TYPE(CQ90_028, cq90_028_device, "cq90_028", "Thomson CQ 90-028 QDD controller")
 
 cq90_028_device::cq90_028_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
@@ -46,6 +49,10 @@ void cq90_028_device::device_add_mconfig(machine_config &config)
 	MC6852(config, m_ssda, DERIVED_CLOCK(1, 1)); // Comes from the main board
 	// Base tx/rx clock is 101564Hz
 	// There's probably a pll in the gate array
+	//
+	// WRPRN signal from the drive is hard wired to the CTSN pin
+	// (24) of the SSDA, ensuring that data transmit is inhibited
+	// when the floppy is write-protected.
 	THOMSON_QDD(config, m_qdd);
 }
 
@@ -62,12 +69,13 @@ void cq90_028_device::device_reset()
 
 void cq90_028_device::drive_w(u8 data)
 {
-	logerror("drive_w %02x\n", data);
+	LOG("drive_w %02x\n", data);
+	m_qdd->set_write_enable (data & 0x80 ? false : true);
 }
 
 void cq90_028_device::motor_w(u8 data)
 {
-	logerror("motor_w %02x\n", data);
+	LOG("motor_w %02x\n", data);
 }
 
 u8 cq90_028_device::status_r()
@@ -78,7 +86,7 @@ u8 cq90_028_device::status_r()
 	static u8 prev;
 	if (data != prev) {
 		prev = data;
-		logerror("status_r %02x\n", data);
+		LOG("status_r %02x\n", data);
 	}
 	return data;
 }
