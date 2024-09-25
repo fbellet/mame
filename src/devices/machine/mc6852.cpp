@@ -357,11 +357,13 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 			static const char *const parname[3] = { "none", "odd", "even" };
 			int bits   = bit[ (data >> 3) & 7 ];
 			int parval = par[ (data >> 3) & 7 ];
+			static const char *const sm_dtr_name[4] = { "1", "pulse", "0", "0" };
 
-			LOGCTRL("MC6852 Control 2 0x%02x bits=%i par=%s blen=%i under=%s%s\n", data,
-					bits, parname[ parval ], data & C2_1_2_BYTE ? 1 : 2,
+			LOGCTRL("MC6852 Control 2 0x%02x bits=%i par=%s blen=%i under=%s%s sm_dtr=%s\n", data,
+					bits, parname[parval], data & C2_1_2_BYTE ? 1 : 2,
 					data & C2_TX_SYNC ? "sync" : "ff",
-					data & C2_EIE ? "irq-err" : "" );
+					data & C2_EIE ? "irq-err" : "",
+					sm_dtr_name[data & (C2_PC1|C2_PC2)]);
 			m_cr[1] = data;
 
 			int data_bit_count = 0;

@@ -11,6 +11,8 @@
 #define VERBOSE 0
 #include "logmacro.h"
 
+#define QDD_BITRATE		101265
+
 DEFINE_DEVICE_TYPE(CQ90_028, cq90_028_device, "cq90_028", "Thomson CQ 90-028 QDD controller")
 
 cq90_028_device::cq90_028_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
@@ -35,8 +37,8 @@ void cq90_028_device::rom_map(address_map &map)
 void cq90_028_device::io_map(address_map &map)
 {
 	map(0x10, 0x11).rw(m_ssda, FUNC(mc6852_device::read), FUNC(mc6852_device::write));
-	map(0x18, 0x18).rw(FUNC(cq90_028_device::status_r), FUNC(cq90_028_device::drive_w));
-	map(0x1c, 0x1c).w(FUNC(cq90_028_device::motor_w));
+	map(0x18, 0x18).rw(FUNC(cq90_028_device::status_r), FUNC(cq90_028_device::wrga_w));
+	//map(0x1c, 0x1c).w(FUNC(cq90_028_device::motor_w));
 }
 
 const tiny_rom_entry *cq90_028_device::device_rom_region() const
@@ -49,32 +51,34 @@ void cq90_028_device::device_add_mconfig(machine_config &config)
 	MC6852(config, m_ssda, DERIVED_CLOCK(1, 1)); // Comes from the main board
 	// Base tx/rx clock is 101564Hz
 	// There's probably a pll in the gate array
-	//
-	// WRPRN signal from the drive is hard wired to the CTSN pin
-	// (24) of the SSDA, ensuring that data transmit is inhibited
-	// when the floppy is write-protected.
 	THOMSON_QDD(config, m_qdd);
 }
 
 void cq90_028_device::device_start()
 {
+	m_byte_timer = timer_alloc(FUNC(cq90_028_device::byte_timer), this);
+	m_byte_timer->adjust(attotime::zero, 0, attotime::from_hz(QDD_BITRATE / 8));
+	m_byte_timer->enable(1);
 }
 
 void cq90_028_device::device_reset()
 {
 	m_ssda->reset();
 	m_ssda->set_data_bus_reversed(true);
-	m_qdd->set_ssda(m_ssda);
 }
 
-void cq90_028_device::drive_w(u8 data)
+void cq90_028_device::wrga_w(u8 data)
 {
-	LOG("drive_w %02x\n", data);
-	m_qdd->set_write_enable (data & 0x80 ? false : true);
+	// Probably used to enable the write gate of the drive
+	LOG("wrga_w %02x\n", data);
+	m_qdd->set_write_enabled (data & 0x80 ? false : true);
 }
 
 void cq90_028_device::motor_w(u8 data)
 {
+	// Motor is controlled by the SM/DTRN output pin of the SSDA
+	// (programmed by C2 bit 1-0, unimplemented in mc6852_device),
+	// so this register is probably misnamed.
 	LOG("motor_w %02x\n", data);
 }
 
@@ -89,4 +93,14 @@ u8 cq90_028_device::status_r()
 		LOG("status_r %02x\n", data);
 	}
 	return data;
+}
+
+TIMER_CALLBACK_MEMBER(cq90_028_device::byte_timer)
+{
+	if (m_qdd->is_write_enabled ()) {
+		int tuf;
+		m_qdd->write(m_ssda->get_tx_byte(&tuf));
+	}
+
+	m_ssda->receive_byte(m_qdd->read());
 }
