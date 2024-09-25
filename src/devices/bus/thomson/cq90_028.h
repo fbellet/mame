@@ -29,14 +29,18 @@ protected:
 	virtual void device_start() override ATTR_COLD;
 	virtual void device_reset() override ATTR_COLD;
 
+	TIMER_CALLBACK_MEMBER(byte_timer);
+
 private:
 	required_device<mc6852_device> m_ssda;
 	required_device<thomson_qdd_image_device> m_qdd;
 	required_memory_region m_rom;
 
-	void drive_w(u8 data);
+	void wrga_w(u8 data);
 	void motor_w(u8 data);
 	u8 status_r();
+
+	emu_timer *m_byte_timer;
 };
 
 DECLARE_DEVICE_TYPE(CQ90_028, cq90_028_device)

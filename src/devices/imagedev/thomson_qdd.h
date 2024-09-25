@@ -43,26 +43,26 @@ public:
 
 	bool disk_present() { return m_disk_present; }
 	bool index() { return m_index; }
-	void set_ssda(mc6852_device *ssda) { m_ssda = ssda; }
-	void set_write_enable(bool value) { m_write_enable = value; }
+	void set_write_enabled(bool value) { m_write_enabled = value; }
+	bool is_write_enabled() { return m_write_enabled; }
+	void write(uint8_t data);
+	uint8_t read();
 
 protected:
 	// device_t implementation
 	virtual void device_start() override;
 
-	TIMER_CALLBACK_MEMBER(bit_timer);
+	TIMER_CALLBACK_MEMBER(byte_timer);
 
 private:
 	std::unique_ptr<uint8_t[]> m_track_buffer;
 
-	int m_bit_offset;
 	int m_byte_offset;
 	bool m_disk_present;
 	bool m_index;
-	bool m_write_enable;
+	bool m_write_enabled;
 
-	mc6852_device *m_ssda;
-	emu_timer *m_bit_timer;
+	emu_timer *m_byte_timer;
 };
 
 

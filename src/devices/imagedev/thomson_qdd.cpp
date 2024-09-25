@@ -54,13 +54,12 @@ void thomson_qdd_image_device::device_start()
 	m_track_buffer = std::make_unique<uint8_t[]>(QDD_TRACK_LENGTH);
 
 	// allocate timers
-	m_bit_timer = timer_alloc(FUNC(thomson_qdd_image_device::bit_timer), this);
-	m_bit_timer->adjust(attotime::zero, 0, attotime::from_hz(QDD_BITRATE));
-	m_bit_timer->enable(0);
+	m_byte_timer = timer_alloc(FUNC(thomson_qdd_image_device::byte_timer), this);
+	m_byte_timer->adjust(attotime::zero, 0, attotime::from_hz(QDD_BITRATE / 8));
+	m_byte_timer->enable(0);
 	m_disk_present = false;
 	m_index = false;
-	m_write_enable = false;
-	m_ssda = nullptr;
+	m_write_enabled = false;
 }
 
 /* fixed interlacing map for QDDs */
@@ -112,15 +111,9 @@ std::pair<std::error_condition, std::string> thomson_qdd_image_device::call_load
 	}
 	memset(dst, 0x16, QDD_TRACK_LENGTH - (int)(dst - org));
 
-	m_bit_offset = 0;
 	m_byte_offset = 0;
 	m_disk_present = true;
-	m_bit_timer->enable(1);
-	if (m_ssda) {
-		m_ssda->cts_w(1);	// TODO: set it to the
-					// write-protect status of the
-					// image
-	}
+	m_byte_timer->enable(1);
 
 	return std::make_pair(std::error_condition(), std::string());
 }
@@ -179,34 +172,39 @@ void thomson_qdd_image_device::call_unload()
 	m_disk_present = false;
 }
 
-TIMER_CALLBACK_MEMBER(thomson_qdd_image_device::bit_timer)
+void thomson_qdd_image_device::write(uint8_t data)
 {
-	m_bit_offset++;
-
-	if ((m_bit_offset == 1) && m_write_enable) {
-		int tuf;
-		uint8_t data = m_ssda->get_tx_byte(&tuf);
-		m_track_buffer[m_byte_offset] = data;
-		LOG("Sent 0x%02x replace=0x%02x tuf=%d [%d/%d] to the QDD\n",
-				data, m_track_buffer[m_byte_offset], tuf,
+	// WRPRN signal from the drive is wired to the CTSN pin
+	// of the SSDA, ensuring that data transmit is inhibited
+	// when the floppy is write-protected.
+	//
+	// Since CTSN is not implemented in mc6852_device yet, we
+	// simulate it behaviour here, at the drive level
+	if (m_write_enabled && !is_readonly()) {
+		LOG("Write 0x%02x replace=0x%02x [%d/%d] to the QDD\n",
+				data, m_track_buffer[m_byte_offset],
 				m_byte_offset, QDD_TRACK_LENGTH);
+		m_track_buffer[m_byte_offset] = data;
 	}
-	if (m_bit_offset == 8)
-	{
-		m_bit_offset = 0;
-		m_index = (m_byte_offset < 13); // 1ms
-		if (m_ssda) {
-			LOG("Sent 0x%02x [%d/%d] to the SSDA\n",
-					m_track_buffer[m_byte_offset],
-					m_byte_offset, QDD_TRACK_LENGTH);
-			m_ssda->receive_byte(m_track_buffer[m_byte_offset]);
-		}
-		m_byte_offset++;
+}
 
-		if (m_byte_offset == QDD_TRACK_LENGTH)
-		{
-			m_byte_offset = 0;
-			LOG("Track completed, restarting\n");
-		}
+uint8_t thomson_qdd_image_device::read()
+{
+	LOG("Read 0x%02x [%d/%d] from the QDD\n",
+			m_track_buffer[m_byte_offset],
+			m_byte_offset, QDD_TRACK_LENGTH);
+	return m_track_buffer[m_byte_offset];
+}
+
+
+TIMER_CALLBACK_MEMBER(thomson_qdd_image_device::byte_timer)
+{
+	m_index = (m_byte_offset < 13); // 1ms
+	m_byte_offset++;
+
+	if (m_byte_offset == QDD_TRACK_LENGTH)
+	{
+		m_byte_offset = 0;
+		LOG("Track completed, restarting\n");
 	}
 }
