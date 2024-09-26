@@ -38,7 +38,7 @@ void cq90_028_device::io_map(address_map &map)
 {
 	map(0x10, 0x11).rw(m_ssda, FUNC(mc6852_device::read), FUNC(mc6852_device::write));
 	map(0x18, 0x18).rw(FUNC(cq90_028_device::status_r), FUNC(cq90_028_device::wrga_w));
-	//map(0x1c, 0x1c).w(FUNC(cq90_028_device::motor_w));
+	map(0x1c, 0x1c).w(FUNC(cq90_028_device::motor_w));
 }
 
 const tiny_rom_entry *cq90_028_device::device_rom_region() const

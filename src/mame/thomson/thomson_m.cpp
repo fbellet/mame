@@ -2255,6 +2255,25 @@ void to9_state::to8_gatearray_w(offs_t offset, uint8_t data)
 			m_to8_reg_ram = data;
 			to8_update_ram_bank();
 		}
+
+		/* 0xe7dc from external floppy drive aliases the video gate-array */
+		if ( m_to8_reg_sys1 & 0x80 )
+		{
+			static uint8_t p_val = 0xff;
+			uint8_t val = ( m_to8_reg_ram & 0x80 );
+			if (val && val != p_val)
+			{
+				LOGMASKED(LOG_VIDEO, "Access to $E7DC mapped to the external controler\n");
+				m_extension->io_map (m_maincpu->space(AS_PROGRAM), 0xe7c0, 0xe7ff);
+			}
+			else if (val == 0 && val != p_val)
+			{
+				LOGMASKED(LOG_VIDEO, "Access to $E7DC mapped to the internal gatearray\n");
+				address_space& space = m_maincpu->space(AS_PROGRAM);
+				space.install_readwrite_handler(0xe7da, 0xe7dd, emu::rw_delegate(*this, FUNC(to9_state::to8_vreg_r)), emu::rw_delegate(*this, FUNC(to9_state::to8_vreg_w)));
+			}
+			p_val = val;
+		}
 		break;
 
 	case 2: /* cartridge register */
@@ -2282,15 +2301,6 @@ void to9_state::to8_gatearray_w(offs_t offset, uint8_t data)
 
 uint8_t to9_state::to8_vreg_r(offs_t offset)
 {
-	/* 0xe7dc from external floppy drive aliases the video gate-array */
-	if ( ( offset == 3 ) && ( m_to8_reg_ram & 0x80 ) && ( m_to8_reg_sys1 & 0x80 ) )
-	{
-		if ( machine().side_effects_disabled() )
-			return 0;
-
-		abort(); // return to7_floppy_r( 0xc );
-	}
-
 	switch ( offset )
 	{
 	case 0: /* palette data */
@@ -2345,17 +2355,9 @@ void to9_state::to8_vreg_w(offs_t offset, uint8_t data)
 		break;
 
 	case 3: /* system register 2 */
-		/* 0xe7dc from external floppy drive aliases the video gate-array */
-		if ( ( offset == 3 ) && ( m_to8_reg_ram & 0x80 ) && ( m_to8_reg_sys1 & 0x80 ) )
-		{
-			abort(); // to7_floppy_w( 0xc, data );
-		}
-		else
-		{
-			m_to8_reg_sys2 = data;
-			thom_set_video_page( data >> 6 );
-			thom_set_border_color( data & 15 );
-		}
+		m_to8_reg_sys2 = data;
+		thom_set_video_page( data >> 6 );
+		thom_set_border_color( data & 15 );
 		break;
 
 	default:
@@ -3175,12 +3177,36 @@ void mo6_state::mo6_gatearray_w(offs_t offset, uint8_t data)
 		break;
 
 	case 1: /* ram register */
+	{
 		if ( m_to8_reg_sys1 & 0x10 )
 		{
 			m_to8_reg_ram = data;
 			mo6_update_ram_bank();
 		}
+		/* 0xa7dc from external floppy drive aliases the video gate-array */
+		/* According the the MO6 hardware manual, bit 7 of m_to8_reg_sys1 is unused, so
+		 * the behaviour is probably different from the TO8 wrt
+		 * $A7DC inhibition
+		 */
+		if ( m_to8_reg_sys1 & 0x80 )
+		{
+			static uint8_t p_val = 0xff;
+			uint8_t val = ( m_to8_reg_ram & 0x80 );
+			if (val && val != p_val)
+			{
+				LOGMASKED(LOG_VIDEO, "Access to $A7DC mapped to the external controler\n");
+				m_extension->io_map (m_maincpu->space(AS_PROGRAM), 0xa7c0, 0xa7ff);
+			}
+			else if (val == 0 && val != p_val)
+			{
+				LOGMASKED(LOG_VIDEO, "Access to $A7DC mapped to the internal gatearray\n");
+				address_space& space = m_maincpu->space(AS_PROGRAM);
+				space.install_readwrite_handler(0xa7da, 0xa7dd, emu::rw_delegate(*this, FUNC(mo6_state::mo6_vreg_r)), emu::rw_delegate(*this, FUNC(mo6_state::mo6_vreg_w)));
+			}
+			p_val = val;
+		}
 		break;
+	}
 
 	case 2: /* cartridge register */
 		m_to8_reg_cart = data;
@@ -3205,13 +3231,6 @@ void mo6_state::mo6_gatearray_w(offs_t offset, uint8_t data)
 
 uint8_t mo6_state::mo6_vreg_r(offs_t offset)
 {
-	/* 0xa7dc from external floppy drive aliases the video gate-array */
-	if ( ( offset == 3 ) && ( m_to8_reg_ram & 0x80 ) )
-		{
-		if ( !machine().side_effects_disabled() )
-			abort(); // return to7_floppy_r( 0xc );
-		}
-
 	switch ( offset )
 	{
 	case 0: /* palette data */
@@ -3241,24 +3260,15 @@ void mo6_state::mo6_vreg_w(offs_t offset, uint8_t data)
 		to8_vreg_w( offset, data );
 		return;
 
-	case 2: /* display / external floppy register */
-		if ( ( m_to8_reg_sys1 & 0x80 ) && ( m_to8_reg_ram & 0x80 ) )
-			abort(); // to7_floppy_w( 0xc, data );
-		else
-			to9_set_video_mode( data, 2 );
+	case 2: /* display */
+		to9_set_video_mode( data, 2 );
 		break;
 
 	case 3: /* system register 2 */
-		/* 0xa7dc from external floppy drive aliases the video gate-array */
-		if ( ( offset == 3 ) && ( m_to8_reg_ram & 0x80 ) )
-			abort(); // to7_floppy_w( 0xc, data );
-		else
-		{
-			m_to8_reg_sys2 = data;
-			thom_set_video_page( data >> 6 );
-			thom_set_border_color( data & 15 );
-			mo6_update_cart_bank();
-		}
+		m_to8_reg_sys2 = data;
+		thom_set_video_page( data >> 6 );
+		thom_set_border_color( data & 15 );
+		mo6_update_cart_bank();
 		break;
 
 	default:
