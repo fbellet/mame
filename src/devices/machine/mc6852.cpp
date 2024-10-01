@@ -77,7 +77,7 @@ mc6852_device::mc6852_device(const machine_config &mconfig, const char *tag, dev
 	m_tx_clock(0),
 	m_cts(1),
 	m_dcd(1),
-	m_sm_dtr(0),
+	m_sm_dtr(1),
 	m_tuf(0),
 	m_in_sync(0),
 	m_data_bus_reversed(false)
@@ -169,6 +169,8 @@ void mc6852_device::receive_byte(uint8_t data)
 		{
 			m_in_sync = 1;
 			// TODO handle the various SM responses
+			if ((m_cr[1] & (C2_PC2 | C2_PC1)) == 1)
+				m_sm_dtr = 1;
 		}
 		return;
 	}
@@ -382,6 +384,13 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 			case 7: data_bit_count = 8; parity = PARITY_ODD; break;
 			}
 
+			switch (data & (C2_PC1|C2_PC2))
+			{
+			case 0: m_sm_dtr = 1; break;
+			case 1: m_sm_dtr = (m_in_sync ? 1 : 0); break;
+			default: m_sm_dtr = 0; break;
+			}
+
 			set_data_frame(1, data_bit_count, parity, stop_bits);
 
 			// The fifo trigger levels may have changed, so update
@@ -422,7 +431,10 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 			if (m_cr[2] & C3_CTS)
 			{
 				m_cr[2] &= ~C3_CTS;
-				m_status &= ~S_CTS;
+				if (m_cts)
+					m_status |= S_CTS;
+				else
+					m_status &= ~S_CTS;
 			}
 			break;
 
@@ -498,8 +510,11 @@ void mc6852_device::write(offs_t offset, uint8_t data)
 		}
 
 		if (data & C1_CLEAR_SYNC)
+		{
 			m_in_sync = 0;
-
+			if ((m_cr[1] & (C2_PC1|C2_PC2)) == 1)
+				m_sm_dtr = 0;
+		}
 		m_cr[0] = data;
 	}
 }
