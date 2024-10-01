@@ -9,6 +9,7 @@
 #include "cq90_028.h"
 
 #define VERBOSE 0
+
 #include "logmacro.h"
 
 #define QDD_BITRATE		101265
@@ -38,7 +39,7 @@ void cq90_028_device::io_map(address_map &map)
 {
 	map(0x10, 0x11).rw(m_ssda, FUNC(mc6852_device::read), FUNC(mc6852_device::write));
 	map(0x18, 0x18).rw(FUNC(cq90_028_device::status_r), FUNC(cq90_028_device::wrga_w));
-	map(0x1c, 0x1c).w(FUNC(cq90_028_device::motor_w));
+	map(0x1c, 0x1c).w(FUNC(cq90_028_device::reg_w));
 }
 
 const tiny_rom_entry *cq90_028_device::device_rom_region() const
@@ -59,48 +60,73 @@ void cq90_028_device::device_start()
 	m_byte_timer = timer_alloc(FUNC(cq90_028_device::byte_timer), this);
 	m_byte_timer->adjust(attotime::zero, 0, attotime::from_hz(QDD_BITRATE / 8));
 	m_byte_timer->enable(1);
+
+	save_item(NAME(m_wrga));
+	save_item(NAME(m_reg));
+	save_item(NAME(m_status));
 }
 
 void cq90_028_device::device_reset()
 {
 	m_ssda->reset();
 	m_ssda->set_data_bus_reversed(true);
+	m_wrga = 0;
+	m_reg = 0;
+	m_status = 0;
 }
 
-void cq90_028_device::wrga_w(u8 data)
+void cq90_028_device::wrga_w(uint8_t data)
 {
-	// Probably used to enable the write gate of the drive
+	m_wrga = data;
+	m_qdd->write_gate_w(data & 0x80 ? 0 : 1);
 	LOG("wrga_w %02x\n", data);
-	m_qdd->set_write_enabled (data & 0x80 ? false : true);
 }
 
-void cq90_028_device::motor_w(u8 data)
+void cq90_028_device::reg_w(uint8_t data)
 {
-	// Motor is controlled by the SM/DTRN output pin of the SSDA
-	// (programmed by C2 bit 1-0, unimplemented in mc6852_device),
-	// so this register is probably misnamed.
-	LOG("motor_w %02x\n", data);
+	m_reg = data;
+	LOG("reg_w %02x\n", data);
 }
 
-u8 cq90_028_device::status_r()
+uint8_t cq90_028_device::status_r()
 {
 	// 40 = disk absent
-	// 80 = index pulse
-	u8 data =  (m_qdd->disk_present() ? 0 : 0x40) | (m_qdd->index() ? 0x80 : 0);
-	static u8 prev;
-	if (data != prev) {
-		prev = data;
-		LOG("status_r %02x\n", data);
+	// 80 = drive not ready
+	m_status = 0;
+	if(!m_qdd->disk_present_r())
+		m_status |= 0x40;
+	if(!m_qdd->ready_r())
+		m_status |= 0x80;
+
+	if(!machine().side_effects_disabled()) {
+		static int ps = -1;
+		if(m_status != ps)
+			LOG("status_r %02x -%s%s\n", m_status,
+				m_status & 0x40 ? "" : " disk",
+				m_status & 0x80 ? "" : " rdy");
+		ps = m_status;
 	}
-	return data;
+	return m_status;
 }
 
 TIMER_CALLBACK_MEMBER(cq90_028_device::byte_timer)
 {
-	if (m_qdd->is_write_enabled ()) {
-		int tuf;
-		m_qdd->write(m_ssda->get_tx_byte(&tuf));
-	}
+	// MTONN is wired to SM/DTRN of mc6852
+	uint8_t motor_on = (m_ssda->sm_dtr_r() ? 0 : 1);
+	m_qdd->motor_on_w(motor_on);
 
-	m_ssda->receive_byte(m_qdd->read());
+	// and WRPRN is wired to CTSN of mc6852
+	uint8_t write_protected = m_qdd->write_protected_r();
+	m_ssda->cts_w(write_protected);
+
+	if (motor_on) {
+		if ((m_wrga & 0x80) == 0) {
+			int tuf;
+			uint8_t data;
+			data = m_ssda->get_tx_byte(&tuf);
+			if (!tuf)
+				m_qdd->write(data);
+		}
+		m_ssda->receive_byte(m_qdd->read());
+	}
 }

@@ -41,16 +41,19 @@ public:
 	virtual const char *image_interface() const noexcept override { return "qdd"; }
 	virtual const char *file_extensions() const noexcept override { return "qd"; }
 
-	bool disk_present() { return m_disk_present; }
-	bool index() { return m_index; }
-	void set_write_enabled(bool value) { m_write_enabled = value; }
-	bool is_write_enabled() { return m_write_enabled; }
+	uint8_t ready_r() { return m_ready; }
+	uint8_t disk_present_r () { return m_disk_present; }
+	uint8_t write_protected_r() { return m_write_protected; }
+	void write_gate_w(int value) { m_write_gate = value; }
+	void motor_on_w(int value);
+
 	void write(uint8_t data);
 	uint8_t read();
 
 protected:
 	// device_t implementation
 	virtual void device_start() override;
+	virtual void device_reset() override;
 
 	TIMER_CALLBACK_MEMBER(byte_timer);
 
@@ -58,9 +61,13 @@ private:
 	std::unique_ptr<uint8_t[]> m_track_buffer;
 
 	int m_byte_offset;
-	bool m_disk_present;
-	bool m_index;
-	bool m_write_enabled;
+	int m_motor_cmd;
+
+	int m_disk_present;
+	int m_motor_on;
+	int m_ready;
+	int m_write_gate;
+	int m_write_protected;
 
 	emu_timer *m_byte_timer;
 };
