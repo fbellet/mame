@@ -36,9 +36,13 @@ private:
 	required_device<thomson_qdd_image_device> m_qdd;
 	required_memory_region m_rom;
 
-	void wrga_w(u8 data);
-	void motor_w(u8 data);
-	u8 status_r();
+	void wrga_w(uint8_t data);
+	void reg_w(uint8_t data);
+	uint8_t status_r();
+
+	uint8_t m_wrga;
+	uint8_t m_reg;
+	uint8_t m_status;
 
 	emu_timer *m_byte_timer;
 };
