@@ -14,7 +14,6 @@
 #pragma once
 
 #include "magtape.h"
-#include "machine/mc6852.h"
 
 
 /***************************************************************************
@@ -22,8 +21,6 @@
 ***************************************************************************/
 
 // ======================> thomson_qdd_image_device
-
-typedef void (*byte_ready_cb_t)(mc6852_device, u8);
 
 class thomson_qdd_image_device : public microtape_image_device
 {
@@ -71,7 +68,6 @@ private:
 
 	emu_timer *m_byte_timer;
 };
-
 
 // device type definition
 DECLARE_DEVICE_TYPE(THOMSON_QDD, thomson_qdd_image_device)

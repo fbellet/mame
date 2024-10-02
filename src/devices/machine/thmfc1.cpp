@@ -15,6 +15,7 @@
 #include "emu.h"
 #include "thmfc1.h"
 #include "imagedev/floppy.h"
+#include "formats/flopimg.h"
 
 #define LOG_FLUX         (1U << 1) // Show flux changes
 #define LOG_STATE        (1U << 2) // Show state machine
@@ -40,6 +41,8 @@
 #define FUNCNAME __PRETTY_FUNCTION__
 #endif
 
+DEFINE_DEVICE_TYPE(THMFC1_CONNECTOR, thmfc1_connector, "thmfc1_connector", "Connector abstraction for floppy or quick disk drive")
+
 DEFINE_DEVICE_TYPE(THMFC1, thmfc1_device, "thmfc1", "Thomson THMFC1 floppy controller")
 
 thmfc1_device::thmfc1_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
@@ -47,10 +50,21 @@ thmfc1_device::thmfc1_device(const machine_config &mconfig, const char *tag, dev
 {
 }
 
-void thmfc1_device::set_floppy(int idx, floppy_image_device *floppy)
+void thmfc1_device::set_floppy(int idx, device_t *floppy)
 {
 	if(idx == 0 || idx == 1)
-		m_floppy[idx] = floppy;
+	{
+		floppy_image_device *floppy_dev = dynamic_cast<floppy_image_device *>(floppy);
+		if(floppy_dev)
+		{
+			m_floppy[idx] = floppy_dev;
+		}
+		thomson_qdd_image_device *qdd_dev = dynamic_cast<thomson_qdd_image_device *>(floppy);
+		if(qdd_dev)
+		{
+			m_qdd[idx] = qdd_dev;
+		}
+	}
 }
 
 void thmfc1_device::device_start()
@@ -796,3 +810,35 @@ void thmfc1_device::flush_flux()
 	}
 }
 
+thmfc1_connector::thmfc1_connector(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
+	device_t(mconfig, THMFC1_CONNECTOR, tag, owner, clock),
+	device_slot_interface(mconfig, *this),
+	formats(nullptr),
+	m_enable_sound(false),
+	m_sectoring_type(floppy_image::SOFT)
+{
+}
+
+thmfc1_connector::~thmfc1_connector()
+{
+}
+
+void thmfc1_connector::device_start()
+{
+}
+
+void thmfc1_connector::device_config_complete()
+{
+	floppy_image_device *dev = dynamic_cast<floppy_image_device *>(get_card_device());
+	if(dev)
+	{
+		dev->set_formats(formats);
+		dev->enable_sound(m_enable_sound);
+		dev->set_sectoring_type(m_sectoring_type);
+	}
+}
+
+device_t *thmfc1_connector::get_device()
+{
+	return dynamic_cast<device_t *>(get_card_device());
+}

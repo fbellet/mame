@@ -1395,6 +1395,7 @@ static void thmfc1_formats(format_registration &fr)
 static void thmfc1_drives(device_slot_interface &device)
 {
 	device.option_add("35dd", FLOPPY_35_DD);
+	device.option_add("qdd", THOMSON_QDD);
 }
 
 void to9_state::to8(machine_config &config)
@@ -1432,8 +1433,8 @@ void to9_state::to8(machine_config &config)
 
 	/* floppy */
 	THMFC1(config, m_thmfc1, 16_MHz_XTAL );
-	FLOPPY_CONNECTOR(config, m_floppy[0], thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, m_floppy[1], thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, m_thmfc1_floppy[0], thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, m_thmfc1_floppy[1], thmfc1_drives, "qdd");
 }
 
 void to9_state::to8d(machine_config &config)
@@ -1600,8 +1601,8 @@ void to9_state::to9p(machine_config &config)
 
 	/* floppy */
 	THMFC1(config, m_thmfc1, 16_MHz_XTAL );
-	FLOPPY_CONNECTOR(config, m_floppy[0], thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, m_floppy[1], thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, m_thmfc1_floppy[0], thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, m_thmfc1_floppy[1], thmfc1_drives, "qdd");
 }
 
 COMP( 1986, to9p, 0, 0, to9p, to9p, to9_state, empty_init, "Thomson", "TO9+", MACHINE_SUPPORTS_SAVE )

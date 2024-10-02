@@ -30,7 +30,7 @@ protected:
 
 private:
 	required_device<thmfc1_device> m_fdc;
-	required_device_array<floppy_connector, 2> m_floppy;
+	required_device_array<thmfc1_connector, 2> m_floppy;
 	required_memory_region m_rom;
 	memory_bank_creator m_rom_bank;
 
