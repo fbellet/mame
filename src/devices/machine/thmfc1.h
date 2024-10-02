@@ -7,6 +7,9 @@
 #pragma once
 
 #include "imagedev/floppy.h"
+#include "imagedev/thomson_qdd.h"
+
+class thmfc1_connector;
 
 class thmfc1_device : public device_t
 {
@@ -70,8 +73,9 @@ private:
 		S_FORMAT,
 	};
 
-	required_device_array<floppy_connector, 2> m_floppy;
+	required_device_array<thmfc1_connector, 2> m_floppy;
 	floppy_image_device *m_cur_floppy;
+	thomson_qdd_image_device *m_cur_qdd;
 	emu_timer *m_timer_motoroff;
 
 	u64 m_last_sync, m_window_start;
@@ -117,5 +121,56 @@ private:
 };
 
 DECLARE_DEVICE_TYPE(THMFC1, thmfc1_device)
+
+class thmfc1_connector: public device_t,
+                                                public device_slot_interface
+{
+public:
+
+        template <typename T>
+	thmfc1_connector(const machine_config &mconfig, const char *tag, device_t *owner, T &&opts, const char *dflt)
+		: thmfc1_connector(mconfig, tag, owner, 0)
+	{
+		option_reset();
+		opts(*this);
+		set_default_option(dflt);
+	}
+
+        template <typename T, typename U>
+	thmfc1_connector(const machine_config &mconfig, const char *tag, device_t *owner, T &&opts, const char *dflt, U &&formats)
+		: thmfc1_connector(mconfig, tag, owner, 0)
+	{
+		option_reset();
+		opts(*this);
+		set_default_option(dflt);
+		set_formats(std::forward<U>(formats));
+	}
+
+        template <typename T, typename U>
+	thmfc1_connector(const machine_config &mconfig, const char *tag, device_t *owner)
+		: thmfc1_connector(mconfig, tag, owner, 0)
+	{
+	}
+
+        thmfc1_connector(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
+	virtual ~thmfc1_connector();
+
+	template <typename T> void set_formats(T &&_formats) { formats = std::forward<T>(_formats); }
+        void enable_sound(bool doit) { m_enable_sound = doit; }
+	void set_sectoring_type(uint32_t sectoring_type) { m_sectoring_type = sectoring_type; }
+
+        device_t *get_device();
+
+protected:
+        virtual void device_start() override;
+	virtual void device_config_complete() override;
+
+private:
+	std::function<void (format_registration &fr)> formats;
+        bool m_enable_sound;
+        uint32_t m_sectoring_type;
+};
+
+DECLARE_DEVICE_TYPE(THMFC1_CONNECTOR, thmfc1_connector)
 
 #endif // MAME_MACHINE_THMFC1_H

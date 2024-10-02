@@ -15,8 +15,7 @@
 
 #include "emu.h"
 #include "thmfc1.h"
-
-DEFINE_DEVICE_TYPE(THMFC1, thmfc1_device, "thmfc1", "SGS-Thomson THM-FC-1 Diskette Controller") // SGS logo used on silkscreen
+#include "formats/flopimg.h"
 
 #define LOG_FLUX         (1U << 1) // Show flux changes
 #define LOG_STATE        (1U << 2) // Show state machine
@@ -41,6 +40,10 @@ DEFINE_DEVICE_TYPE(THMFC1, thmfc1_device, "thmfc1", "SGS-Thomson THM-FC-1 Disket
 #else
 #define FUNCNAME __PRETTY_FUNCTION__
 #endif
+
+DEFINE_DEVICE_TYPE(THMFC1_CONNECTOR, thmfc1_connector, "thmfc1_connector", "Connector abstraction for floppy or quick disk drive")
+
+DEFINE_DEVICE_TYPE(THMFC1, thmfc1_device, "thmfc1", "SGS-Thomson THM-FC-1 Diskette Controller") // SGS logo used on silkscreen
 
 thmfc1_device::thmfc1_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, THMFC1, tag, owner, clock),
@@ -126,12 +129,18 @@ TIMER_CALLBACK_MEMBER(thmfc1_device::motor_off)
 
 void thmfc1_device::device_post_load()
 {
-	if(m_cmd2 & C2_DRS0)
-		m_cur_floppy = m_floppy[0]->get_device();
-	else if(m_cmd2 & C2_DRS1)
-		m_cur_floppy = m_floppy[1]->get_device();
-	else
+	if(m_cmd2 & C2_DRS0) {
+		m_cur_floppy = dynamic_cast<floppy_image_device *>(m_floppy[0]->get_device());
+		m_cur_qdd = dynamic_cast<thomson_qdd_image_device *>(m_floppy[0]->get_device());
+	}
+	else if(m_cmd2 & C2_DRS1) {
+		m_cur_floppy = dynamic_cast<floppy_image_device *>(m_floppy[1]->get_device());
+		m_cur_qdd = dynamic_cast<thomson_qdd_image_device *>(m_floppy[1]->get_device());
+	}
+	else {
 		m_cur_floppy = nullptr;
+		m_cur_qdd = nullptr;
+	}
 }
 
 void thmfc1_device::cmd0_w(u8 data)
@@ -211,12 +220,18 @@ void thmfc1_device::cmd2_w(u8 data)
 			 m_cmd2 & C2_DRS1 ? 'b' : '-',
 			 m_cmd2 & C2_DRS0 ? 'a' : '-');
 
-	if(m_cmd2 & C2_DRS0)
-		m_cur_floppy = m_floppy[0]->get_device();
-	else if(m_cmd2 & C2_DRS1)
-		m_cur_floppy = m_floppy[1]->get_device();
-	else
+	if(m_cmd2 & C2_DRS0) {
+		m_cur_floppy = dynamic_cast<floppy_image_device *>(m_floppy[0]->get_device());
+		m_cur_qdd = dynamic_cast<thomson_qdd_image_device *>(m_floppy[0]->get_device());
+	}
+	else if(m_cmd2 & C2_DRS1) {
+		m_cur_floppy = dynamic_cast<floppy_image_device *>(m_floppy[1]->get_device());
+		m_cur_qdd = dynamic_cast<thomson_qdd_image_device *>(m_floppy[1]->get_device());
+	}
+	else {
 		m_cur_floppy = nullptr;
+		m_cur_qdd = nullptr;
+	}
 
 	if(m_cur_floppy) {
 		if((prev & C2_MTON) && !(m_cmd2 & C2_MTON))
@@ -805,3 +820,35 @@ void thmfc1_device::flush_flux()
 	}
 }
 
+thmfc1_connector::thmfc1_connector(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
+	device_t(mconfig, THMFC1_CONNECTOR, tag, owner, clock),
+	device_slot_interface(mconfig, *this),
+	formats(nullptr),
+	m_enable_sound(false),
+	m_sectoring_type(floppy_image::SOFT)
+{
+}
+
+thmfc1_connector::~thmfc1_connector()
+{
+}
+
+void thmfc1_connector::device_start()
+{
+}
+
+void thmfc1_connector::device_config_complete()
+{
+	floppy_image_device *dev = dynamic_cast<floppy_image_device *>(get_card_device());
+	if(dev)
+	{
+		dev->set_formats(formats);
+		dev->enable_sound(m_enable_sound);
+		dev->set_sectoring_type(m_sectoring_type);
+	}
+}
+
+device_t *thmfc1_connector::get_device()
+{
+	return dynamic_cast<device_t *>(get_card_device());
+}

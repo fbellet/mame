@@ -66,8 +66,8 @@ void cd90_351_device::floppy_formats(format_registration &fr)
 void cd90_351_device::device_add_mconfig(machine_config &config)
 {
 	THMFC1(config, "thmfc1", 16_MHz_XTAL);
-	FLOPPY_CONNECTOR(config, "thmfc1:0", floppy_drives, "dd90_352", floppy_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, "thmfc1:1", floppy_drives, nullptr, floppy_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, "thmfc1:0", floppy_drives, "dd90_352", floppy_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, "thmfc1:1", floppy_drives, nullptr, floppy_formats).enable_sound(true);
 }
 
 void cd90_351_device::device_start()

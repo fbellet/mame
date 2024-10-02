@@ -1353,6 +1353,7 @@ static void thmfc1_formats(format_registration &fr)
 static void thmfc1_drives(device_slot_interface &device)
 {
 	device.option_add("35dd", FLOPPY_35_DD);
+	device.option_add("qdd", THOMSON_QDD);
 }
 
 void to9_state::to8(machine_config &config)
@@ -1375,8 +1376,8 @@ void to9_state::to8(machine_config &config)
 
 	/* floppy */
 	THMFC1(config, "thmfc1", 16_MHz_XTAL );
-	FLOPPY_CONNECTOR(config, "thmfc1:0", thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, "thmfc1:1", thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, "thmfc1:0", thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, "thmfc1:1", thmfc1_drives, "qdd");
 
 	m_extension->option_remove("cd90_015");
 	m_extension->option_remove("cq90_028");
@@ -1403,7 +1404,7 @@ void to9_state::to8(machine_config &config)
 void to9_state::to8d(machine_config &config)
 {
 	to8(config);
-	subdevice<floppy_connector>("thmfc1:0")->set_fixed(true);
+	subdevice<thmfc1_connector>("thmfc1:0")->set_fixed(true);
 }
 
 
@@ -1527,8 +1528,8 @@ void to9_state::to9p(machine_config &config)
 	m_pia_sys->irqb_handler().set("mainfirq", FUNC(input_merger_device::in_w<1>));
 
 	THMFC1(config, "thmfc1", 16_MHz_XTAL );
-	FLOPPY_CONNECTOR(config, "thmfc1:0", thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, "thmfc1:1", thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, "thmfc1:0", thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, "thmfc1:1", thmfc1_drives, "qdd");
 
 	m_extension->option_remove("cd90_015");
 	m_extension->option_remove("cq90_028");
