@@ -43,6 +43,8 @@ public:
 	uint8_t write_protected_r() { return m_write_protected; }
 	void write_gate_w(int value) { m_write_gate = value; }
 	void motor_on_w(int value);
+	attotime byte_timer_start() { return m_byte_timer->start(); }
+	attotime byte_timer_expire() { return m_byte_timer->expire(); }
 
 	void write(uint8_t data);
 	uint8_t read();
