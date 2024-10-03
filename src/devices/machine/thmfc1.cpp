@@ -15,25 +15,28 @@
 
 #include "emu.h"
 #include "thmfc1.h"
+#include "imagedev/thomson_qdd.h"
 #include "formats/flopimg.h"
 
-#define LOG_FLUX         (1U << 1) // Show flux changes
-#define LOG_STATE        (1U << 2) // Show state machine
-#define LOG_SHIFT        (1U << 3) // Show shift register contents
-#define LOG_REGS         (1U << 4) // Show register access
-#define LOG_COMMAND      (1U << 5) // Show command invocation
-#define LOG_STAT0        (1U << 6) // Show stat0 register updates
+#define LOG_FLUX	(1U << 1) // Show flux changes
+#define LOG_STATE	(1U << 2) // Show state machine
+#define LOG_SHIFT	(1U << 3) // Show shift register contents
+#define LOG_REGS	(1U << 4) // Show register access
+#define LOG_COMMAND	(1U << 5) // Show command invocation
+#define LOG_STAT0	(1U << 6) // Show stat0 register updates
+#define LOG_QDD		(1U << 7) // Show QDD specific timings
 
 // #define VERBOSE (LOG_COMMAND)
 
 #include "logmacro.h"
 
-#define LOGFLUX(...)        LOGMASKED(LOG_FLUX, __VA_ARGS__)
-#define LOGSHIFT(...)       LOGMASKED(LOG_SHIFT, __VA_ARGS__)
-#define LOGSTATE(...)       LOGMASKED(LOG_STATE, __VA_ARGS__)
-#define LOGREGS(...)        LOGMASKED(LOG_REGS, __VA_ARGS__)
-#define LOGCOMMAND(...)     LOGMASKED(LOG_COMMAND, __VA_ARGS__)
-#define LOGSTAT0(...)       LOGMASKED(LOG_STAT0, __VA_ARGS__)
+#define LOGFLUX(...)	LOGMASKED(LOG_FLUX, __VA_ARGS__)
+#define LOGSHIFT(...)	LOGMASKED(LOG_SHIFT, __VA_ARGS__)
+#define LOGSTATE(...)	LOGMASKED(LOG_STATE, __VA_ARGS__)
+#define LOGREGS(...)	LOGMASKED(LOG_REGS, __VA_ARGS__)
+#define LOGCOMMAND(...)	LOGMASKED(LOG_COMMAND, __VA_ARGS__)
+#define LOGSTAT0(...)	LOGMASKED(LOG_STAT0, __VA_ARGS__)
+#define LOGQDD(...)	LOGMASKED(LOG_QDD, __VA_ARGS__)
 
 #ifdef _MSC_VER
 #define FUNCNAME __func__
@@ -118,6 +121,7 @@ void thmfc1_device::device_reset()
 	m_write_buffer_start = 0;
 	m_state = S_IDLE;
 	m_cur_floppy = nullptr;
+	m_cur_qdd = nullptr;
 }
 
 TIMER_CALLBACK_MEMBER(thmfc1_device::motor_off)
@@ -172,6 +176,7 @@ void thmfc1_device::cmd0_w(u8 data)
 		} else {
 			flush_flux();
 			m_state = S_READ_WAIT_HEADER_SYNC;
+			m_window_start = m_last_sync;
 			LOGSTATE("s_read_wait_header_sync start\n");
 		}
 		break;
@@ -191,6 +196,8 @@ void thmfc1_device::cmd0_w(u8 data)
 		LOGSTATE("s_read_wait_header_sync start\n");
 		break;
 	}
+	if(m_cur_qdd)
+		m_cur_qdd->write_gate_w(m_cmd0 & C0_WGC);
 }
 
 void thmfc1_device::cmd1_w(u8 data)
@@ -233,7 +240,12 @@ void thmfc1_device::cmd2_w(u8 data)
 		m_cur_qdd = nullptr;
 	}
 
-	if(m_cur_floppy) {
+	if(m_cur_qdd) {
+		if((prev & C2_SISELB) && !(m_cmd2 & C2_SISELB))
+			m_cur_qdd->motor_on_w(0);
+		if(!(prev & C2_SISELB) && (m_cmd2 & C2_SISELB))
+			m_cur_qdd->motor_on_w(1);
+	} else if(m_cur_floppy) {
 		if((prev & C2_MTON) && !(m_cmd2 & C2_MTON))
 			m_timer_motoroff->adjust(attotime::from_seconds(2));
 		if(m_cmd2 & C2_MTON) {
@@ -254,7 +266,7 @@ void thmfc1_device::wdata_w(u8 data)
 	if(m_stat0 & S0_BYTE)
 		LOGSTAT0("byte unset in stat0\n");
 	if(m_stat0 & S0_DREQ)
-		LOGSTAT0("byte unset in stat0\n");
+		LOGSTAT0("dreq unset in stat0\n");
 	m_stat0 &= ~(S0_BYTE | S0_DREQ);
 	LOGREGS("wdata_w %02x\n", data);
 }
@@ -312,7 +324,17 @@ u8 thmfc1_device::stat0_r()
 u8 thmfc1_device::stat1_r()
 {
 	u8 res = 0;
-	if(m_cur_floppy) {
+	if(m_cur_qdd) {
+		if(!m_cur_qdd->disk_present_r())
+			res |= S1_INDX;
+		if(m_cmd2 & C2_SISELB)
+			res |= S1_MTON;
+		res |= S1_TRK0;
+		if(m_cur_qdd->write_protected_r())
+			res |= S1_WPRT;
+		if(m_cur_qdd->ready_r())
+			res |= S1_RDY;
+	} else if(m_cur_floppy) {
 		if(m_cur_floppy->idx_r())
 			res |= S1_INDX;
 		if(!m_cur_floppy->dskchg_r())
@@ -367,6 +389,55 @@ attotime thmfc1_device::cycles_to_time(u64 cycles) const
 
 bool thmfc1_device::read_one_bit(u64 limit, u64 &next_flux_change)
 {
+	if (m_cur_qdd)
+		return read_one_bit_qdd(limit);
+	else
+		return read_one_bit_floppy(limit, next_flux_change);
+}
+
+
+bool thmfc1_device::read_one_bit_qdd(u64 limit)
+{
+#define QDD_BITRATE		101265
+	u64 window_end = m_window_start + (8 * 16000000 / QDD_BITRATE);
+	if(window_end > limit) {
+		LOGQDD("flux_window %s [ %d .. (%d) .. %d ]\n", machine().time().to_string(), m_window_start, limit, window_end);
+		return true;
+	} else
+		LOGQDD("flux_window %s [ %d .. %d ] .. (%d)\n", machine().time().to_string(), m_window_start, window_end, limit);
+	while(window_end < limit - (8 * 16000000 / QDD_BITRATE))
+		window_end += (8 * 16000000 / QDD_BITRATE);
+
+	m_rdata = m_cur_qdd->read();
+
+	u64 start = time_to_cycles(m_cur_qdd->byte_timer_start());
+	u64 expire = time_to_cycles(m_cur_qdd->byte_timer_expire());
+	if (!m_cur_qdd->byte_timer_expire().is_never()) {
+		LOGQDD("QDD byte_timer %s [ %d .. %d ]\n", machine().time().to_string(), start, expire);
+		window_end = expire - (4 * 16000000 / QDD_BITRATE);
+	}
+
+	if(~m_stat0 & S0_BYTE)
+		LOGSTAT0("byte set in stat0\n");
+	m_stat0 |= S0_BYTE;
+
+	if(m_cmd0 & C0_ENSYN && (m_rdata == m_wdata && m_clk != 0xff)) {
+		if(~m_stat0 & S0_SYNC)
+			LOGSTAT0("sync set in stat0 (wdata=0x%02x clk=0x%02x)\n", m_wdata, m_clk);
+		m_stat0 |= S0_SYNC;
+	} else {
+		if(m_stat0 & S0_SYNC)
+			LOGSTAT0("sync unset in stat0\n");
+		m_stat0 &= ~S0_SYNC;
+	}
+
+	m_window_start = window_end;
+	m_last_sync = window_end;
+	return false;
+}
+
+bool thmfc1_device::read_one_bit_floppy(u64 limit, u64 &next_flux_change)
+{
 	while(next_flux_change <= m_last_sync) {
 		attotime flux = m_cur_floppy ? m_cur_floppy->get_next_transition(cycles_to_time(m_last_sync + 1)) : attotime::never;
 		next_flux_change = flux.is_never() ? u64(-1) : time_to_cycles(flux);
@@ -391,8 +462,8 @@ bool thmfc1_device::read_one_bit(u64 limit, u64 &next_flux_change)
 
 	m_last_sync = window_end;
 
-        if (m_cur_floppy == nullptr)
-                return false;
+	if (m_cur_floppy == nullptr)
+		return false;
 
 	m_shift_reg = (m_shift_reg << 1) | m_bit;
 	if(m_bit_counter & 1) {
@@ -404,9 +475,9 @@ bool thmfc1_device::read_one_bit(u64 limit, u64 &next_flux_change)
 	} else
 		m_shift_clk_reg = (m_shift_clk_reg << 1) | m_bit;
 
-        LOGSHIFT("read %s bit[%x]=%d shift_reg=0x%04x c=0x%02x d=0x%02x crc=0x%04x\n",
-                m_bit_counter & 1 ? "[d]" : "[c]", m_bit_counter, m_bit,
-                m_shift_reg, m_shift_clk_reg, m_shift_data_reg, m_crc);
+	LOGSHIFT("read %s bit[%x]=%d shift_reg=0x%04x c=0x%02x d=0x%02x crc=0x%04x\n",
+		m_bit_counter & 1 ? "[d]" : "[c]", m_bit_counter, m_bit,
+		m_shift_reg, m_shift_clk_reg, m_shift_data_reg, m_crc);
 
 	m_bit_counter++;
 	m_bit_counter &= 0xf;
@@ -434,7 +505,46 @@ bool thmfc1_device::read_one_bit(u64 limit, u64 &next_flux_change)
 
 	return false;
 }
+
 bool thmfc1_device::write_one_bit(u64 limit)
+{
+	if (m_cur_qdd)
+		return write_one_bit_qdd(limit);
+	else
+		return write_one_bit_floppy(limit);
+}
+
+bool thmfc1_device::write_one_bit_qdd(u64 limit)
+{
+	u64 window_end = m_window_start + (8 * 16000000 / QDD_BITRATE);
+	if(window_end > limit) {
+		LOGQDD("flux_window %s [ %d .. (%d) .. %d ]\n", machine().time().to_string(), m_window_start, limit, window_end);
+		return true;
+	} else
+		LOGQDD("flux_window %s [ %d .. %d ] .. (%d)\n", machine().time().to_string(), m_window_start, window_end, limit);
+	while(window_end < limit - (8 * 16000000 / QDD_BITRATE))
+		window_end += (8 * 16000000 / QDD_BITRATE);
+
+	if(m_byte_counter > 0 && ~m_stat0 & S0_BYTE)
+		m_cur_qdd->write(m_wdata);
+
+	u64 start = time_to_cycles(m_cur_qdd->byte_timer_start());
+	u64 expire = time_to_cycles(m_cur_qdd->byte_timer_expire());
+	if (!m_cur_qdd->byte_timer_expire().is_never()) {
+		LOGQDD("QDD byte_timer %s [ %d .. %d ]\n", machine().time().to_string(), start, expire);
+		window_end = expire - (4 * 16000000 / QDD_BITRATE);
+	}
+
+	if(~m_stat0 & S0_BYTE)
+		LOGSTAT0("byte set in stat0\n");
+	m_stat0 |= S0_BYTE;
+
+	m_window_start = window_end;
+	m_last_sync = window_end;
+	return false;
+}
+
+bool thmfc1_device::write_one_bit_floppy(u64 limit)
 {
 	u64 window_end = m_window_start + ((m_cell & 0x7f) + 1);
 	if(window_end > limit)
@@ -448,11 +558,11 @@ bool thmfc1_device::write_one_bit(u64 limit)
 	if(m_bit_counter & 1)
 		m_bit = (m_shift_data_reg >> 7);
 	else if(m_use_shift_clk_reg)
-                m_bit = (m_shift_clk_reg >> 7);
-        else if(m_cmd0 & C0_FM)
-                m_bit = 1;
-        else
-                m_bit = !(m_bit || (m_shift_data_reg >> 7));
+		m_bit = (m_shift_clk_reg >> 7);
+	else if(m_cmd0 & C0_FM)
+		m_bit = 1;
+	else
+		m_bit = !(m_bit || (m_shift_data_reg >> 7));
 
 	LOGSHIFT("write %s bit[%x]=%d c=0x%02x d=0x%02x crc=0x%04x\n",
 		m_bit_counter & 1 ? "[d]" : "[c]", m_bit_counter, m_bit,

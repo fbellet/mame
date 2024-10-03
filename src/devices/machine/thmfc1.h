@@ -83,7 +83,7 @@ private:
 
 	u16 m_shift_reg, m_crc;
 	u8 m_bit_counter;
-	u16 m_byte_counter;
+	u32 m_byte_counter;
 	u8 m_shift_data_reg, m_shift_clk_reg;
 	u8 m_bit;
 
@@ -115,8 +115,15 @@ private:
 	attotime cycles_to_time(u64 cycles) const;
 
 	void sync();
+
 	bool read_one_bit(u64 limit, u64 &next_flux_change);
+	bool read_one_bit_floppy(u64 limit, u64 &next_flux_change);
+	bool read_one_bit_qdd(u64 limit);
+
 	bool write_one_bit(u64 limit);
+	bool write_one_bit_floppy(u64 limit);
+	bool write_one_bit_qdd(u64 limit);
+
 	void flush_flux();
 };
 
