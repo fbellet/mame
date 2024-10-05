@@ -240,18 +240,14 @@ void thmfc1_device::cmd2_w(u8 data)
 		m_cur_qdd = nullptr;
 	}
 
-	if(m_cur_qdd) {
-		if((prev & C2_SISELB) && !(m_cmd2 & C2_SISELB))
-			m_cur_qdd->motor_on_w(0);
-		if(!(prev & C2_SISELB) && (m_cmd2 & C2_SISELB))
-			m_cur_qdd->motor_on_w(1);
-	} else if(m_cur_floppy) {
-		if((prev & C2_MTON) && !(m_cmd2 & C2_MTON))
-			m_timer_motoroff->adjust(attotime::from_seconds(2));
+	if(m_cur_qdd)
+		m_cur_qdd->motor_on_w(m_cmd2 & C2_SISELB);
+	else if(m_cur_floppy) {
 		if(m_cmd2 & C2_MTON) {
 			m_cur_floppy->mon_w(0);
 			m_timer_motoroff->adjust(attotime::never);
-		}
+		} else if (prev & C2_MTON)
+			m_timer_motoroff->adjust(attotime::from_seconds(2));
 		m_cur_floppy->ss_w(m_cmd2 & C2_SISELB ? 0 : 1);
 		m_cur_floppy->dir_w(m_cmd2 & C2_DIRECB ? 0 : 1);
 		m_cur_floppy->stp_w(m_cmd2 & C2_STEP ? 0 : 1);
