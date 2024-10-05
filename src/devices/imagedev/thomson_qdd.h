@@ -41,8 +41,8 @@ public:
 	uint8_t ready_r() { return m_ready; }
 	uint8_t disk_present_r () { return m_disk_present; }
 	uint8_t write_protected_r() { return m_write_protected; }
-	void write_gate_w(int value) { m_write_gate = value; }
-	void motor_on_w(int value);
+	void write_gate_w(int state) { m_write_gate = state; }
+	void motor_on_w(int state);
 	attotime byte_timer_start() { return m_byte_timer->start(); }
 	attotime byte_timer_expire() { return m_byte_timer->expire(); }
 

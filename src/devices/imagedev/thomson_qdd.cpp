@@ -299,21 +299,21 @@ uint8_t thomson_qdd_image_device::read()
 	return val;
 }
 
-void thomson_qdd_image_device::motor_on_w(int data)
+void thomson_qdd_image_device::motor_on_w(int state)
 {
-	int prev = m_motor_on;
-	m_motor_on = data;
+	if(m_motor_on == state)
+		return;
 
-	if(m_motor_on != prev)
-		LOGHW("%s [%d/%d] motor_on set %s\n", machine().time().to_string(),
-				m_byte_offset, QDD_TRACK_LEN, m_motor_on ? "on":"off");
-	if(m_motor_on == 1 && prev == 0) {
+	m_motor_on = state;
+
+	LOGHW("%s [%d/%d] motor_on set %s\n", machine().time().to_string(),
+			m_byte_offset, QDD_TRACK_LEN, m_motor_on ? "on":"off");
+	if(m_motor_on)
 		m_byte_timer->adjust(attotime::zero, 0, attotime::from_hz(QDD_BITRATE / 8));
-		if (m_motor_cmd == 0) {
-			m_motor_cmd = 1;
-			LOGHW("%s [%d/%d] motor_cmd set on\n", machine().time().to_string(),
+	if (m_motor_on && !m_motor_cmd) {
+		m_motor_cmd = 1;
+		LOGHW("%s [%d/%d] motor_cmd set on\n", machine().time().to_string(),
 					m_byte_offset, QDD_TRACK_LEN);
-		}
 	}
 }
 
