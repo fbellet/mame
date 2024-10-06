@@ -53,12 +53,12 @@ thmfc1_device::thmfc1_device(const machine_config &mconfig, const char *tag, dev
 {
 }
 
-void thmfc1_device::set_floppy(int idx, device_t *floppy)
+void thmfc1_device::set_drive(int idx, device_t *device)
 {
 	if(idx == 0 || idx == 1)
 	{
-		m_floppy[idx] = dynamic_cast<floppy_image_device *>(floppy);
-		m_qdd[idx] = dynamic_cast<thomson_qdd_image_device *>(floppy);
+		m_floppy[idx] = dynamic_cast<floppy_image_device *>(device);
+		m_qdd[idx] = dynamic_cast<thomson_qdd_image_device *>(device);
 		m_cur_floppy = nullptr;
 		m_cur_qdd = nullptr;
 	}

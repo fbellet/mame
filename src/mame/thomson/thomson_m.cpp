@@ -2496,8 +2496,8 @@ MACHINE_RESET_MEMBER( to9_state, to8 )
 	/* thom_cart_bank not reset */
 
 	/* floppy */
-	m_thmfc1->set_floppy(0, m_thmfc1_floppy[0]->get_device());
-	m_thmfc1->set_floppy(1, m_thmfc1_floppy[1]->get_device());
+	m_thmfc1->set_drive(0, m_drive[0]->get_device());
+	m_thmfc1->set_drive(1, m_drive[1]->get_device());
 }
 
 
@@ -2645,8 +2645,8 @@ MACHINE_RESET_MEMBER( to9_state, to9p )
 	/* thom_cart_bank not reset */
 
 	/* floppy */
-	m_thmfc1->set_floppy(0, m_thmfc1_floppy[0]->get_device());
-	m_thmfc1->set_floppy(1, m_thmfc1_floppy[1]->get_device());
+	m_thmfc1->set_drive(0, m_drive[0]->get_device());
+	m_thmfc1->set_drive(1, m_drive[1]->get_device());
 }
 
 

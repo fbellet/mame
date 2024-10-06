@@ -395,8 +395,8 @@ public:
 		m_to9_kbd(*this, "to9_kbd"),
 		m_thmfc1(*this, "thmfc1"),
 		m_wd2793(*this, "wd2793"),
-		m_floppy(*this, "floppy_connector_%u", 0U),
-		m_thmfc1_floppy(*this, "thmfc1_connector_%u", 0U),
+		m_floppy(*this, "drive%u", 1U),
+		m_drive(*this, "drive%u", 1U),
 		m_qdd(*this, "qdd"),
 		m_centronics(*this, "centronics"),
 		m_cent_data_out(*this, "cent_data_out"),
@@ -419,7 +419,7 @@ protected:
 	optional_device<thmfc1_device> m_thmfc1;
 	optional_device<wd2793_device> m_wd2793;
 	optional_device_array<floppy_connector, 2> m_floppy;
-	optional_device_array<thmfc1_connector, 2> m_thmfc1_floppy;
+	optional_device_array<thmfc1_connector, 2> m_drive;
 	optional_device<thomson_qdd_image_device> m_qdd;
 	optional_device<centronics_device> m_centronics;
 	optional_device<output_latch_device> m_cent_data_out;

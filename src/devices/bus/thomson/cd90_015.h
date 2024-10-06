@@ -30,7 +30,7 @@ protected:
 	TIMER_CALLBACK_MEMBER(motor_tick);
 
 private:
-	required_device<mc6843_device> m_fdc;
+	required_device<mc6843_device> m_mc6843;
 	required_device_array<floppy_connector, 4> m_floppy;
 	required_memory_region m_rom;
 

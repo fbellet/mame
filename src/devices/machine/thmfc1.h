@@ -31,7 +31,7 @@ public:
 	u8 stat1_r();
 	u8 rdata_r();
 
-	void set_floppy(int idx, device_t *floppy);
+	void set_drive(int idx, device_t *device);
 
 protected:
 	TIMER_CALLBACK_MEMBER(motor_off);

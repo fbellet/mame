@@ -5,20 +5,21 @@
 // CD 90-351 - Custom floppy drive controller (THMFC1)
 //
 // Handles up to two 3.5 dual-sided drives (DD 90-352)
-// or up to two 2.8 dual-sided QDD drivers (QD 90-280)
+// or one 2.8 single-sided QDD (Quick Disk Drive) (QD 90-280)
+// TODO: test one DD 90-352 drive in DS0 and one QD 90-280 in DS1
 
 
 #include "emu.h"
 #include "cd90_351.h"
 #include "formats/thom_dsk.h"
 
-DEFINE_DEVICE_TYPE(CD90_351, cd90_351_device, "cd90_351", "Thomson CD 90-351 Diskette Controller")
+DEFINE_DEVICE_TYPE(CD90_351, cd90_351_device, "cd90_351", "Thomson CD 90-351 Floppy Drive Controller")
 
 cd90_351_device::cd90_351_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, CD90_351, tag, owner, 16000000),
 	thomson_extension_interface(mconfig, *this),
-	m_fdc(*this, "fdc"),
-	m_floppy(*this, "drive%u", 0U),
+	m_thmfc1(*this, "thmfc1"),
+	m_drive(*this, "drive%u", 1U),
 	m_rom(*this, "rom"),
 	m_rom_bank(*this, "rom_bank")
 {
@@ -42,14 +43,14 @@ void cd90_351_device::rom_map(address_map &map)
 
 void cd90_351_device::io_map(address_map &map)
 {
-	map(0x10, 0x10).rw(m_fdc, FUNC(thmfc1_device::stat0_r), FUNC(thmfc1_device::cmd0_w));
-	map(0x11, 0x11).rw(m_fdc, FUNC(thmfc1_device::stat1_r), FUNC(thmfc1_device::cmd1_w));
-	map(0x12, 0x12).w(m_fdc, FUNC(thmfc1_device::cmd2_w));
-	map(0x13, 0x13).rw(m_fdc, FUNC(thmfc1_device::rdata_r), FUNC(thmfc1_device::wdata_w));
-	map(0x14, 0x14).w(m_fdc, FUNC(thmfc1_device::wclk_w));
-	map(0x15, 0x15).w(m_fdc, FUNC(thmfc1_device::wsect_w));
-	map(0x16, 0x16).w(m_fdc, FUNC(thmfc1_device::wtrck_w));
-	map(0x17, 0x17).w(m_fdc, FUNC(thmfc1_device::wcell_w));
+	map(0x10, 0x10).rw(m_thmfc1, FUNC(thmfc1_device::stat0_r), FUNC(thmfc1_device::cmd0_w));
+	map(0x11, 0x11).rw(m_thmfc1, FUNC(thmfc1_device::stat1_r), FUNC(thmfc1_device::cmd1_w));
+	map(0x12, 0x12).w(m_thmfc1, FUNC(thmfc1_device::cmd2_w));
+	map(0x13, 0x13).rw(m_thmfc1, FUNC(thmfc1_device::rdata_r), FUNC(thmfc1_device::wdata_w));
+	map(0x14, 0x14).w(m_thmfc1, FUNC(thmfc1_device::wclk_w));
+	map(0x15, 0x15).w(m_thmfc1, FUNC(thmfc1_device::wsect_w));
+	map(0x16, 0x16).w(m_thmfc1, FUNC(thmfc1_device::wtrck_w));
+	map(0x17, 0x17).w(m_thmfc1, FUNC(thmfc1_device::wcell_w));
 	map(0x18, 0x18).w(FUNC(cd90_351_device::bank_w));
 }
 
@@ -58,13 +59,13 @@ const tiny_rom_entry *cd90_351_device::device_rom_region() const
 	return ROM_NAME(cd90_351);
 }
 
-void cd90_351_device::floppy_drives(device_slot_interface &device)
+void cd90_351_device::thmfc1_drives(device_slot_interface &device)
 {
 	device.option_add("dd90_352", FLOPPY_35_DD);
-	//  device.option_add("qd90_280", FLOPPY_28_QDD);
+	device.option_add("qd90_280", THOMSON_QDD);
 }
 
-void cd90_351_device::floppy_formats(format_registration &fr)
+void cd90_351_device::thmfc1_formats(format_registration &fr)
 {
 	fr.add(FLOPPY_THOMSON_35_FD_FORMAT);
 	fr.add(FLOPPY_THOMSON_SAP_FORMAT);
@@ -72,23 +73,23 @@ void cd90_351_device::floppy_formats(format_registration &fr)
 
 void cd90_351_device::device_add_mconfig(machine_config &config)
 {
-	THMFC1(config, m_fdc, 16_MHz_XTAL);
-	THMFC1_CONNECTOR(config, m_floppy[0], floppy_drives, "dd90_352", floppy_formats).enable_sound(true);
-	THMFC1_CONNECTOR(config, m_floppy[1], floppy_drives, nullptr, floppy_formats).enable_sound(true);
+	THMFC1(config, m_thmfc1, 16_MHz_XTAL);
+	THMFC1_CONNECTOR(config, m_drive[0], thmfc1_drives, "dd90_352", thmfc1_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, m_drive[1], thmfc1_drives, "dd90_352", thmfc1_formats).enable_sound(true);
 }
 
 void cd90_351_device::device_start()
 {
 	m_rom_bank->configure_entries(0, 4, m_rom->base(), 0x800);
-	m_fdc->set_floppy(0, m_floppy[0]);
-	//m_fdc->set_floppy(1, m_floppy[1]->get_device());
+	m_thmfc1->set_drive(0, m_drive[0]->get_device());
+	m_thmfc1->set_drive(1, m_drive[1]->get_device());
 }
 
 void cd90_351_device::device_reset()
 {
 	m_rom_bank->set_entry(0);
-	m_fdc->set_floppy(0, m_floppy[0]);
-	//m_fdc->set_floppy(1, m_floppy[1]->get_device());
+	m_thmfc1->set_drive(0, m_drive[0]->get_device());
+	m_thmfc1->set_drive(1, m_drive[1]->get_device());
 }
 
 void cd90_351_device::bank_w(u8 data)

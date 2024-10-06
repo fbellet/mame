@@ -1168,10 +1168,14 @@ static void wd2793_formats(format_registration &fr)
 	fr.add(FLOPPY_THOMSON_SAP_FORMAT);
 }
 
-static void wd2793_drives(device_slot_interface &device)
+static void wd2793_internal_drives(device_slot_interface &device)
 {
 	device.option_add("35ssdd", FLOPPY_35_SSDD);
-	device.option_add("35dd", FLOPPY_35_DD);
+}
+
+static void wd2793_external_drives(device_slot_interface &device)
+{
+	device.option_add("dd90_352", FLOPPY_35_DD);
 }
 
 void to9_state::to9(machine_config &config)
@@ -1202,8 +1206,8 @@ void to9_state::to9(machine_config &config)
 
 	/* floppy */
 	WD2793(config, m_wd2793, 16_MHz_XTAL / 16);
-	FLOPPY_CONNECTOR(config, m_floppy[0], wd2793_drives, "35ssdd", wd2793_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, m_floppy[1], wd2793_drives, "35dd", wd2793_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[0], wd2793_internal_drives, "35ssdd", wd2793_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[1], wd2793_external_drives, "dd90_352", wd2793_formats).enable_sound(true);
 }
 
 
@@ -1392,10 +1396,15 @@ static void thmfc1_formats(format_registration &fr)
 	fr.add(FLOPPY_THOMSON_SAP_FORMAT);
 }
 
-static void thmfc1_drives(device_slot_interface &device)
+static void thmfc1_internal_drives(device_slot_interface &device)
 {
 	device.option_add("35dd", FLOPPY_35_DD);
-	device.option_add("qdd", THOMSON_QDD);
+}
+
+static void thmfc1_external_drives(device_slot_interface &device)
+{
+	device.option_add("dd90_352", FLOPPY_35_DD);
+	device.option_add("qd90_280", THOMSON_QDD);
 }
 
 void to9_state::to8(machine_config &config)
@@ -1433,8 +1442,8 @@ void to9_state::to8(machine_config &config)
 
 	/* floppy */
 	THMFC1(config, m_thmfc1, 16_MHz_XTAL );
-	THMFC1_CONNECTOR(config, m_thmfc1_floppy[0], thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
-	THMFC1_CONNECTOR(config, m_thmfc1_floppy[1], thmfc1_drives, "qdd");
+	THMFC1_CONNECTOR(config, m_drive[0], thmfc1_external_drives, "dd90_352", thmfc1_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, m_drive[1], thmfc1_external_drives, "dd90_352", thmfc1_formats).enable_sound(true);
 }
 
 void to9_state::to8d(machine_config &config)
@@ -1601,8 +1610,8 @@ void to9_state::to9p(machine_config &config)
 
 	/* floppy */
 	THMFC1(config, m_thmfc1, 16_MHz_XTAL );
-	THMFC1_CONNECTOR(config, m_thmfc1_floppy[0], thmfc1_drives, "35dd", thmfc1_formats).enable_sound(true);
-	THMFC1_CONNECTOR(config, m_thmfc1_floppy[1], thmfc1_drives, "qdd");
+	THMFC1_CONNECTOR(config, m_drive[0], thmfc1_internal_drives, "35dd", thmfc1_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, m_drive[1], thmfc1_external_drives, "dd90_352", thmfc1_formats).enable_sound(true);
 }
 
 COMP( 1986, to9p, 0, 0, to9p, to9p, to9_state, empty_init, "Thomson", "TO9+", MACHINE_SUPPORTS_SAVE )
