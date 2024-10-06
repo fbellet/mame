@@ -32,7 +32,7 @@ protected:
 	TIMER_CALLBACK_MEMBER(byte_timer);
 
 private:
-	required_device<mc6852_device> m_ssda;
+	required_device<mc6852_device> m_mc6852;
 	required_device<thomson_qdd_image_device> m_qdd;
 	required_memory_region m_rom;
 

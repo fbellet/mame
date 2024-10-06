@@ -10,13 +10,13 @@
 #include "cd90_015.h"
 #include "formats/thom_dsk.h"
 
-DEFINE_DEVICE_TYPE(CD90_015, cd90_015_device, "cd90_015", "Thomson CD 90-015 floppy drive controller")
+DEFINE_DEVICE_TYPE(CD90_015, cd90_015_device, "cd90_015", "Thomson CD 90-015 Floppy Drive Controller")
 
 cd90_015_device::cd90_015_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, CD90_015, tag, owner, clock),
 	thomson_extension_interface(mconfig, *this),
-	m_fdc(*this, "fdc"),
-	m_floppy(*this, "%u", 0U),
+	m_mc6843(*this, "mc8643"),
+	m_floppy(*this, "mc8643:%u", 0U),
 	m_rom(*this, "rom")
 {
 }
@@ -33,7 +33,7 @@ void cd90_015_device::rom_map(address_map &map)
 
 void cd90_015_device::io_map(address_map &map)
 {
-	map(0x10, 0x17).m(m_fdc, FUNC(mc6843_device::map));
+	map(0x10, 0x17).m(m_mc6843, FUNC(mc6843_device::map));
 	map(0x18, 0x19).rw(FUNC(cd90_015_device::motor_r), FUNC(cd90_015_device::select_w));
 }
 
@@ -83,12 +83,12 @@ void cd90_015_device::floppy_formats(format_registration &fr)
 
 void cd90_015_device::device_add_mconfig(machine_config &config)
 {
-	MC6843(config, m_fdc, DERIVED_CLOCK(1, 2)); // Comes from the main board
-	m_fdc->force_ready();
+	MC6843(config, m_mc6843, DERIVED_CLOCK(1, 2)); // Comes from the main board
+	m_mc6843->force_ready();
 	FLOPPY_CONNECTOR(config, m_floppy[0], floppy_drives, "ud90_070", floppy_formats).enable_sound(true);
 	FLOPPY_CONNECTOR(config, m_floppy[1], floppy_drives, "ud90_070", floppy_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, m_floppy[2], floppy_drives, nullptr,    floppy_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, m_floppy[3], floppy_drives, nullptr,    floppy_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[2], floppy_drives, nullptr, floppy_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[3], floppy_drives, nullptr, floppy_formats).enable_sound(true);
 }
 
 TIMER_CALLBACK_MEMBER(cd90_015_device::motor_tick)
@@ -111,7 +111,7 @@ void cd90_015_device::device_reset()
 		if(f)
 			f->mon_w(1);
 	}
-	m_fdc->set_floppy(nullptr);
+	m_mc6843->set_floppy(nullptr);
 }
 
 void cd90_015_device::select_w(u8 data)
@@ -121,10 +121,10 @@ void cd90_015_device::select_w(u8 data)
 
 	for(int i = 0; i != 5; i++)
 		if(m_select & (1 << i)) {
-			m_fdc->set_floppy(m_floppy[i]->get_device());
+			m_mc6843->set_floppy(m_floppy[i]->get_device());
 			goto found;
 		}
-	m_fdc->set_floppy(nullptr);
+	m_mc6843->set_floppy(nullptr);
 
  found:
 	for(int i = 0; i != 4; i++)

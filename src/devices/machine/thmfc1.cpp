@@ -50,7 +50,7 @@ DEFINE_DEVICE_TYPE(THMFC1, thmfc1_device, "thmfc1", "SGS-Thomson THM-FC-1 Disket
 
 thmfc1_device::thmfc1_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, THMFC1, tag, owner, clock),
-	m_floppy(*this, "%u", 0U)
+	m_drive(*this, "%u", 0U)
 {
 }
 
@@ -134,12 +134,12 @@ TIMER_CALLBACK_MEMBER(thmfc1_device::motor_off)
 void thmfc1_device::device_post_load()
 {
 	if(m_cmd2 & C2_DRS0) {
-		m_cur_floppy = dynamic_cast<floppy_image_device *>(m_floppy[0]->get_device());
-		m_cur_qdd = dynamic_cast<thomson_qdd_image_device *>(m_floppy[0]->get_device());
+		m_cur_floppy = dynamic_cast<floppy_image_device *>(m_drive[0]->get_device());
+		m_cur_qdd = dynamic_cast<thomson_qdd_image_device *>(m_drive[0]->get_device());
 	}
 	else if(m_cmd2 & C2_DRS1) {
-		m_cur_floppy = dynamic_cast<floppy_image_device *>(m_floppy[1]->get_device());
-		m_cur_qdd = dynamic_cast<thomson_qdd_image_device *>(m_floppy[1]->get_device());
+		m_cur_floppy = dynamic_cast<floppy_image_device *>(m_drive[1]->get_device());
+		m_cur_qdd = dynamic_cast<thomson_qdd_image_device *>(m_drive[1]->get_device());
 	}
 	else {
 		m_cur_floppy = nullptr;
@@ -228,12 +228,11 @@ void thmfc1_device::cmd2_w(u8 data)
 			 m_cmd2 & C2_DRS0 ? 'a' : '-');
 
 	if(m_cmd2 & C2_DRS0) {
-		m_cur_floppy = dynamic_cast<floppy_image_device *>(m_floppy[0]->get_device());
-		m_cur_qdd = dynamic_cast<thomson_qdd_image_device *>(m_floppy[0]->get_device());
-	}
-	else if(m_cmd2 & C2_DRS1) {
-		m_cur_floppy = dynamic_cast<floppy_image_device *>(m_floppy[1]->get_device());
-		m_cur_qdd = dynamic_cast<thomson_qdd_image_device *>(m_floppy[1]->get_device());
+		m_cur_floppy = dynamic_cast<floppy_image_device *>(m_drive[0]->get_device());
+		m_cur_qdd = dynamic_cast<thomson_qdd_image_device *>(m_drive[0]->get_device());
+	} else if(m_cmd2 & C2_DRS1) {
+		m_cur_floppy = dynamic_cast<floppy_image_device *>(m_drive[1]->get_device());
+		m_cur_qdd = dynamic_cast<thomson_qdd_image_device *>(m_drive[1]->get_device());
 	}
 	else {
 		m_cur_floppy = nullptr;

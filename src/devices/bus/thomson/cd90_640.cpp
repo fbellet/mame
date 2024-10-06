@@ -10,13 +10,13 @@
 #include "cd90_640.h"
 #include "formats/thom_dsk.h"
 
-DEFINE_DEVICE_TYPE(CD90_640, cd90_640_device, "cd90_640", "Thomson CD 90-640 floppy drive controller")
+DEFINE_DEVICE_TYPE(CD90_640, cd90_640_device, "cd90_640", "Thomson CD 90-640 Floppy Drive Controller")
 
 cd90_640_device::cd90_640_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, CD90_640, tag, owner, clock),
 	thomson_extension_interface(mconfig, *this),
-	m_fdc(*this, "fdc"),
-	m_floppy(*this, "%u", 0U),
+	m_wd1770(*this, "wd1770"),
+	m_floppy(*this, "wd1770:%u", 0U),
 	m_rom(*this, "rom")
 {
 }
@@ -33,7 +33,7 @@ void cd90_640_device::rom_map(address_map &map)
 
 void cd90_640_device::io_map(address_map &map)
 {
-	map(0x10, 0x13).rw(m_fdc, FUNC(wd1770_device::read), FUNC(wd1770_device::write));
+	map(0x10, 0x13).rw(m_wd1770, FUNC(wd1770_device::read), FUNC(wd1770_device::write));
 	map(0x18, 0x18).rw(FUNC(cd90_640_device::control_r), FUNC(cd90_640_device::control_w));
 }
 
@@ -56,7 +56,7 @@ void cd90_640_device::floppy_formats(format_registration &fr)
 
 void cd90_640_device::device_add_mconfig(machine_config &config)
 {
-	WD1770(config, m_fdc, 8_MHz_XTAL);
+	WD1770(config, m_wd1770, 8_MHz_XTAL);
 	FLOPPY_CONNECTOR(config, m_floppy[0], floppy_drives, "dd90_320", floppy_formats).enable_sound(true);
 	FLOPPY_CONNECTOR(config, m_floppy[1], floppy_drives, "sd90_640", floppy_formats).enable_sound(true);
 }
@@ -69,8 +69,8 @@ void cd90_640_device::device_start()
 void cd90_640_device::device_reset()
 {
 	m_control = 0;
-	m_fdc->set_floppy(nullptr);
-	m_fdc->dden_w(0);
+	m_wd1770->set_floppy(nullptr);
+	m_wd1770->dden_w(0);
 }
 
 void cd90_640_device::control_w(u8 data)
@@ -83,8 +83,8 @@ void cd90_640_device::control_w(u8 data)
 		floppy = m_floppy[1]->get_device();
 	if(floppy)
 		floppy->ss_w(m_control & 1);
-	m_fdc->set_floppy(floppy);
-	m_fdc->dden_w(m_control & 0x80 ? 1 : 0);
+	m_wd1770->set_floppy(floppy);
+	m_wd1770->dden_w(m_control & 0x80 ? 1 : 0);
 	logerror("control %02x\n", m_control);
 }
 

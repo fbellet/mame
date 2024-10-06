@@ -5,7 +5,8 @@
 // CD 90-351 - Custom floppy drive controller (THMFC1)
 //
 // Handles up to two 3.5 dual-sided drives (DD 90-352)
-// or up to two 2.8 dual-sided QDD drivers (QD 90-280)
+// or one 2.8 single-sided QDD (Quick Disk Drive) (QD 90-280)
+// TODO: test one DD 90-352 drive in DS0 and one QD 90-280 in DS1
 
 
 #include "emu.h"
@@ -13,7 +14,7 @@
 #include "formats/thom_dsk.h"
 #include "machine/thmfc1.h"
 
-DEFINE_DEVICE_TYPE(CD90_351, cd90_351_device, "cd90_351", "Thomson CD 90-351 Diskette Controller")
+DEFINE_DEVICE_TYPE(CD90_351, cd90_351_device, "cd90_351", "Thomson CD 90-351 Floppy Drive Controller")
 
 cd90_351_device::cd90_351_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, CD90_351, tag, owner, clock),
@@ -51,13 +52,13 @@ const tiny_rom_entry *cd90_351_device::device_rom_region() const
 	return ROM_NAME(cd90_351);
 }
 
-void cd90_351_device::floppy_drives(device_slot_interface &device)
+void cd90_351_device::thmfc1_drives(device_slot_interface &device)
 {
 	device.option_add("dd90_352", FLOPPY_35_DD);
-	//  device.option_add("qd90_280", FLOPPY_28_QDD);
+	device.option_add("qd90_280", THOMSON_QDD);
 }
 
-void cd90_351_device::floppy_formats(format_registration &fr)
+void cd90_351_device::thmfc1_formats(format_registration &fr)
 {
 	fr.add(FLOPPY_THOMSON_35_FD_FORMAT);
 	fr.add(FLOPPY_THOMSON_SAP_FORMAT);
@@ -66,8 +67,8 @@ void cd90_351_device::floppy_formats(format_registration &fr)
 void cd90_351_device::device_add_mconfig(machine_config &config)
 {
 	THMFC1(config, "thmfc1", 16_MHz_XTAL);
-	THMFC1_CONNECTOR(config, "thmfc1:0", floppy_drives, "dd90_352", floppy_formats).enable_sound(true);
-	THMFC1_CONNECTOR(config, "thmfc1:1", floppy_drives, nullptr, floppy_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, "thmfc1:0", thmfc1_drives, "dd90_352", thmfc1_formats).enable_sound(true);
+	THMFC1_CONNECTOR(config, "thmfc1:1", thmfc1_drives, "dd90_352", thmfc1_formats).enable_sound(true);
 }
 
 void cd90_351_device::device_start()

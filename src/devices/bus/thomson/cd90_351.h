@@ -4,7 +4,8 @@
 // CD 90-351 - Custom floppy drive controller (THMFC1)
 //
 // Handles up to two 3.5 dual-sided drives (DD 90-352)
-// or up to two 2.8 dual-sided QDD drivers (QD 90-280)
+// or one 2.8 single-sided QDD (Quick Disk Drive) (QD 90-280)
+// TODO: test one DD 90-352 drive in DS0 and one QD 90-280 in DS1
 
 #ifndef MAME_BUS_THOMSON_CD90_351_H
 #define MAME_BUS_THOMSON_CD90_351_H
@@ -33,8 +34,8 @@ private:
 	required_memory_region m_rom;
 	memory_bank_creator m_rom_bank;
 
-	static void floppy_formats(format_registration &fr);
-	static void floppy_drives(device_slot_interface &device);
+	static void thmfc1_formats(format_registration &fr);
+	static void thmfc1_drives(device_slot_interface &device);
 
 	void bank_w(u8 data);
 };

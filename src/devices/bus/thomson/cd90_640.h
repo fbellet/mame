@@ -29,7 +29,7 @@ protected:
 	virtual void device_reset() override ATTR_COLD;
 
 private:
-	required_device<wd1770_device> m_fdc;
+	required_device<wd1770_device> m_wd1770;
 	required_device_array<floppy_connector, 2> m_floppy;
 	required_memory_region m_rom;
 

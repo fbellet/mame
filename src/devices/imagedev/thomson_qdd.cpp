@@ -16,7 +16,7 @@
 #define LOG_READ	(1U << 3) // Show byte read operations
 #define LOG_WRITE	(1U << 4) // Show byte write operations
 
-// #define VERBOSE (LOG_IMG|LOG_HW)
+// #define VERBOSE (LOG_HW)
 
 #include "logmacro.h"
 

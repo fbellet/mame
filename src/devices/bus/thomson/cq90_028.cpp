@@ -14,12 +14,12 @@
 
 #define QDD_BITRATE		101265
 
-DEFINE_DEVICE_TYPE(CQ90_028, cq90_028_device, "cq90_028", "Thomson CQ 90-028 QDD controller")
+DEFINE_DEVICE_TYPE(CQ90_028, cq90_028_device, "cq90_028", "Thomson CQ 90-028 Quick Disk Drive Controller")
 
 cq90_028_device::cq90_028_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, CQ90_028, tag, owner, clock),
 	thomson_extension_interface(mconfig, *this),
-	m_ssda(*this, "ssda"),
+	m_mc6852(*this, "mc6852"),
 	m_qdd(*this, "qdd"),
 	m_rom(*this, "rom")
 {
@@ -37,7 +37,7 @@ void cq90_028_device::rom_map(address_map &map)
 
 void cq90_028_device::io_map(address_map &map)
 {
-	map(0x10, 0x11).rw(m_ssda, FUNC(mc6852_device::read), FUNC(mc6852_device::write));
+	map(0x10, 0x11).rw(m_mc6852, FUNC(mc6852_device::read), FUNC(mc6852_device::write));
 	map(0x18, 0x18).rw(FUNC(cq90_028_device::status_r), FUNC(cq90_028_device::wrga_w));
 	map(0x1c, 0x1c).w(FUNC(cq90_028_device::reg_w));
 }
@@ -49,7 +49,7 @@ const tiny_rom_entry *cq90_028_device::device_rom_region() const
 
 void cq90_028_device::device_add_mconfig(machine_config &config)
 {
-	MC6852(config, m_ssda, DERIVED_CLOCK(1, 1)); // Comes from the main board
+	MC6852(config, m_mc6852, DERIVED_CLOCK(1, 1)); // Comes from the main board
 	// Base tx/rx clock is 101564Hz
 	// There's probably a pll in the gate array
 	THOMSON_QDD(config, m_qdd);
@@ -68,8 +68,8 @@ void cq90_028_device::device_start()
 
 void cq90_028_device::device_reset()
 {
-	m_ssda->reset();
-	m_ssda->set_data_bus_reversed(true);
+	m_mc6852->reset();
+	m_mc6852->set_data_bus_reversed(true);
 	m_wrga = 0;
 	m_reg = 0;
 	m_status = 0;
@@ -112,21 +112,21 @@ uint8_t cq90_028_device::status_r()
 TIMER_CALLBACK_MEMBER(cq90_028_device::byte_timer)
 {
 	// MTONN is wired to SM/DTRN of mc6852
-	uint8_t motor_on = (m_ssda->sm_dtr_r() ? 0 : 1);
+	uint8_t motor_on = (m_mc6852->sm_dtr_r() ? 0 : 1);
 	m_qdd->motor_on_w(motor_on);
 
 	// and WRPRN is wired to CTSN of mc6852
 	uint8_t write_protected = m_qdd->write_protected_r();
-	m_ssda->cts_w(write_protected);
+	m_mc6852->cts_w(write_protected);
 
 	if (motor_on) {
 		if ((m_wrga & 0x80) == 0) {
 			int tuf;
 			uint8_t data;
-			data = m_ssda->get_tx_byte(&tuf);
+			data = m_mc6852->get_tx_byte(&tuf);
 			if (!tuf)
 				m_qdd->write(data);
 		}
-		m_ssda->receive_byte(m_qdd->read());
+		m_mc6852->receive_byte(m_qdd->read());
 	}
 }

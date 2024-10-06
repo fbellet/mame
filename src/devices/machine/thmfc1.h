@@ -73,7 +73,7 @@ private:
 		S_FORMAT,
 	};
 
-	required_device_array<thmfc1_connector, 2> m_floppy;
+	required_device_array<thmfc1_connector, 2> m_drive;
 	floppy_image_device *m_cur_floppy;
 	thomson_qdd_image_device *m_cur_qdd;
 	emu_timer *m_timer_motoroff;
