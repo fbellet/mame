@@ -24,11 +24,11 @@
 
 const char *const m6x09_base_disassembler::m6x09_regs[5] = { "X", "Y", "U", "S", "PC" };
 
-const char *const m6x09_base_disassembler::m6x09_btwregs[5] = { "CC", "A", "B", "inv" };
+const char *const m6x09_base_disassembler::m6x09_btwregs[5] = { "CC", "A", "B", "?" };
 
 const char *const m6x09_base_disassembler::hd6309_tfmregs[16] = {
-	"D",   "X",   "Y",   "U",   "S", "inv", "inv", "inv",
-	"inv", "inv", "inv", "inv", "inv", "inv", "inv", "inv"
+	"D", "X", "Y", "U", "S", "?", "?", "?",
+	"?", "?", "?", "?", "?", "?", "?", "?"
 };
 
 const char *const m6x09_base_disassembler::tfm_s[] = { "%s+,%s+", "%s-,%s-", "%s+,%s", "%s,%s+" };
@@ -101,9 +101,9 @@ const m6x09_base_disassembler::opcodeinfo *m6x09_base_disassembler::fetch_opcode
 			// on the 6809 an unimplemented page 2 or 3 opcodes fall through to the first page.
 			if (!(m_level & HD6309_EXCLUSIVE) && (m_page != 0))
 			{
-				// backup the opcode pointer and disassemble the bare opcode.
 				--p;
 				m_page = 0;
+				return nullptr;
 			}
 			else
 				// nothing to disassemble.
@@ -167,9 +167,7 @@ offs_t m6x09_base_disassembler::disassemble(std::ostream &stream, offs_t pc, con
 	if (!op)
 	{
 		// illegal opcode
-		util::stream_format(stream, "%-7s$%02X", "FCB", opcodes.r8(pc));
-		for (offs_t q = pc + 1; q < p; q++)
-			util::stream_format(stream, ",$%02X", opcodes.r8(q));
+		util::stream_format(stream, "%-7s", "??");
 		return (p - pc) | SUPPORTED;
 	}
 
@@ -289,7 +287,8 @@ offs_t m6x09_base_disassembler::disassemble(std::ostream &stream, offs_t pc, con
 			pb = params.r8(ppc);
 		}
 
-		indexed(stream, pb, params, p);
+		indexed(stream, pb, params, p, m_level);
+
 		break;
 
 	case IMM:
@@ -388,8 +387,8 @@ const m6x09_base_disassembler::opcodeinfo m6x09_disassembler::m6x09_opcodes[] =
 	{ 0x21, 1, "BRN",   REL,    M6x09_GENERAL },
 	{ 0x22, 1, "BHI",   REL,    M6x09_GENERAL, STEP_COND },
 	{ 0x23, 1, "BLS",   REL,    M6x09_GENERAL, STEP_COND },
-	{ 0x24, 1, "BCC",   REL,    M6x09_GENERAL, STEP_COND },
-	{ 0x25, 1, "BCS",   REL,    M6x09_GENERAL, STEP_COND },
+	{ 0x24, 1, "BHS",   REL,    M6x09_GENERAL, STEP_COND },
+	{ 0x25, 1, "BLO",   REL,    M6x09_GENERAL, STEP_COND },
 	{ 0x26, 1, "BNE",   REL,    M6x09_GENERAL, STEP_COND },
 	{ 0x27, 1, "BEQ",   REL,    M6x09_GENERAL, STEP_COND },
 	{ 0x28, 1, "BVC",   REL,    M6x09_GENERAL, STEP_COND },
@@ -639,8 +638,8 @@ const m6x09_base_disassembler::opcodeinfo m6x09_disassembler::m6x09_opcodes[] =
 	{ 0x1021, 2, "LBRN",  LREL, M6x09_GENERAL },
 	{ 0x1022, 2, "LBHI",  LREL, M6x09_GENERAL },
 	{ 0x1023, 2, "LBLS",  LREL, M6x09_GENERAL },
-	{ 0x1024, 2, "LBCC",  LREL, M6x09_GENERAL },
-	{ 0x1025, 2, "LBCS",  LREL, M6x09_GENERAL },
+	{ 0x1024, 2, "LBHS",  LREL, M6x09_GENERAL },
+	{ 0x1025, 2, "LBLO",  LREL, M6x09_GENERAL },
 	{ 0x1026, 2, "LBNE",  LREL, M6x09_GENERAL },
 	{ 0x1027, 2, "LBEQ",  LREL, M6x09_GENERAL },
 	{ 0x1028, 2, "LBVC",  LREL, M6x09_GENERAL },
@@ -897,7 +896,7 @@ m6x09_disassembler::m6x09_disassembler(uint32_t level, const char teregs[16][4])
 //  indexed addressing mode for M6809/HD6309
 //-------------------------------------------------
 
-void m6x09_disassembler::indexed(std::ostream &stream, uint8_t pb, const data_buffer &params, offs_t &p)
+void m6x09_disassembler::indexed(std::ostream &stream, uint8_t pb, const data_buffer &params, offs_t &p, uint32_t level)
 {
 	uint8_t reg = (pb >> 5) & 3;
 	uint8_t pbm = pb & 0x8f;
@@ -906,13 +905,13 @@ void m6x09_disassembler::indexed(std::ostream &stream, uint8_t pb, const data_bu
 	unsigned int ea;
 
 	// open brackets if indirect
-	if (indirect && pbm != 0x82)
+	if (indirect)
 		util::stream_format(stream, "[");
 
 	switch (pbm)
 	{
 	case 0x80:  // ,R+ or operations relative to W
-		if (indirect)
+		if (indirect && level & HD6309_EXCLUSIVE)
 		{
 			switch (reg)
 			{
@@ -933,6 +932,11 @@ void m6x09_disassembler::indexed(std::ostream &stream, uint8_t pb, const data_bu
 				break;
 			}
 		}
+		else if (indirect)
+		{
+			util::stream_format(stream, "??");
+			--p;
+		}
 		else
 			util::stream_format(stream, ",%s+", m6x09_regs[reg]);
 		break;
@@ -943,7 +947,10 @@ void m6x09_disassembler::indexed(std::ostream &stream, uint8_t pb, const data_bu
 
 	case 0x82:  // ,-R
 		if (indirect)
-			stream << "Illegal Postbyte";
+		{
+			util::stream_format(stream, "??");
+			--p;
+		}
 		else
 			util::stream_format(stream, ",-%s", m6x09_regs[reg]);
 		break;
@@ -965,7 +972,13 @@ void m6x09_disassembler::indexed(std::ostream &stream, uint8_t pb, const data_bu
 		break;
 
 	case 0x87:  // (+/- E),R
-		util::stream_format(stream, "E,%s", m6x09_regs[reg]);
+		if (level & HD6309_EXCLUSIVE)
+			util::stream_format(stream, "E,%s", m6x09_regs[reg]);
+		else
+		{
+			util::stream_format(stream, "??");
+			--p;
+		}
 		break;
 
 	case 0x88:  // (+/- 7 bit offset),R
@@ -984,7 +997,13 @@ void m6x09_disassembler::indexed(std::ostream &stream, uint8_t pb, const data_bu
 		break;
 
 	case 0x8a:  // (+/- F),R
-		util::stream_format(stream, "F,%s", m6x09_regs[reg]);
+		if (level & HD6309_EXCLUSIVE)
+			util::stream_format(stream, "F,%s", m6x09_regs[reg]);
+		else
+		{
+			util::stream_format(stream, "??");
+			--p;
+		}
 		break;
 
 	case 0x8b:  // (+/- D),R
@@ -1003,7 +1022,13 @@ void m6x09_disassembler::indexed(std::ostream &stream, uint8_t pb, const data_bu
 		break;
 
 	case 0x8e:  // (+/- W),R
-		util::stream_format(stream, "W,%s", m6x09_regs[reg]);
+		if (level & HD6309_EXCLUSIVE)
+			util::stream_format(stream, "W,%s", m6x09_regs[reg]);
+		else
+		{
+			util::stream_format(stream, "??");
+			--p;
+		}
 		break;
 
 	case 0x8f:  // address or operations relative to W
@@ -1014,7 +1039,7 @@ void m6x09_disassembler::indexed(std::ostream &stream, uint8_t pb, const data_bu
 			util::stream_format(stream, "$%04X", ea);
 			break;
 		}
-		else
+		else if (level & HD6309_EXCLUSIVE)
 		{
 			switch (reg)
 			{
@@ -1035,6 +1060,11 @@ void m6x09_disassembler::indexed(std::ostream &stream, uint8_t pb, const data_bu
 				break;
 			}
 		}
+		else
+		{
+			util::stream_format(stream, "??");
+			--p;
+		}
 		break;
 
 	default:    // (+/- 4 bit offset),R
@@ -1048,7 +1078,7 @@ void m6x09_disassembler::indexed(std::ostream &stream, uint8_t pb, const data_bu
 	}
 
 	// close brackets if indirect
-	if (indirect && pbm != 0x82)
+	if (indirect)
 		util::stream_format(stream, "]");
 }
 
@@ -1071,12 +1101,12 @@ void m6x09_disassembler::register_register(std::ostream &stream, uint8_t pb)
 
 const char m6809_disassembler::m6809_teregs[16][4] =
 {
-	"D", "X",  "Y",  "U",   "S",  "PC", "inv", "inv",
-	"A", "B", "CC", "DP", "inv", "inv", "inv", "inv"
+	"D", "X",  "Y",  "U", "S", "PC", "?", "?",
+	"A", "B", "CC", "DP", "?",  "?", "?", "?"
 };
 
 
-m6809_disassembler::m6809_disassembler() : m6x09_disassembler(M6x09_GENERAL|M6809_UNDOCUMENTED, m6809_teregs)
+m6809_disassembler::m6809_disassembler() : m6x09_disassembler(M6x09_GENERAL, m6809_teregs)
 {
 }
 
@@ -1195,7 +1225,7 @@ const m6x09_base_disassembler::opcodeinfo konami_disassembler::konami_opcodes[] 
 
 	{ 0x60, 1, "BRA",   REL,    M6x09_GENERAL },
 	{ 0x61, 1, "BHI",   REL,    M6x09_GENERAL, STEP_COND },
-	{ 0x62, 1, "BCC",   REL,    M6x09_GENERAL, STEP_COND },
+	{ 0x62, 1, "BHS",   REL,    M6x09_GENERAL, STEP_COND },
 	{ 0x63, 1, "BNE",   REL,    M6x09_GENERAL, STEP_COND },
 	{ 0x64, 1, "BVC",   REL,    M6x09_GENERAL, STEP_COND },
 	{ 0x65, 1, "BPL",   REL,    M6x09_GENERAL, STEP_COND },
@@ -1203,7 +1233,7 @@ const m6x09_base_disassembler::opcodeinfo konami_disassembler::konami_opcodes[] 
 	{ 0x67, 1, "BGT",   REL,    M6x09_GENERAL, STEP_COND },
 	{ 0x68, 2, "LBRA",  LREL,   M6x09_GENERAL },
 	{ 0x69, 2, "LBHI",  LREL,   M6x09_GENERAL, STEP_COND },
-	{ 0x6A, 2, "LBCC",  LREL,   M6x09_GENERAL, STEP_COND },
+	{ 0x6A, 2, "LBHS",  LREL,   M6x09_GENERAL, STEP_COND },
 	{ 0x6B, 2, "LBNE",  LREL,   M6x09_GENERAL, STEP_COND },
 	{ 0x6C, 2, "LBVC",  LREL,   M6x09_GENERAL, STEP_COND },
 	{ 0x6D, 2, "LBPL",  LREL,   M6x09_GENERAL, STEP_COND },
@@ -1212,7 +1242,7 @@ const m6x09_base_disassembler::opcodeinfo konami_disassembler::konami_opcodes[] 
 
 	{ 0x70, 1, "BRN",   REL,    M6x09_GENERAL },
 	{ 0x71, 1, "BLS",   REL,    M6x09_GENERAL, STEP_COND },
-	{ 0x72, 1, "BCS",   REL,    M6x09_GENERAL, STEP_COND },
+	{ 0x72, 1, "BLO",   REL,    M6x09_GENERAL, STEP_COND },
 	{ 0x73, 1, "BEQ",   REL,    M6x09_GENERAL, STEP_COND },
 	{ 0x74, 1, "BVS",   REL,    M6x09_GENERAL, STEP_COND },
 	{ 0x75, 1, "BMI",   REL,    M6x09_GENERAL, STEP_COND },
@@ -1220,7 +1250,7 @@ const m6x09_base_disassembler::opcodeinfo konami_disassembler::konami_opcodes[] 
 	{ 0x77, 1, "BLE",   REL,    M6x09_GENERAL, STEP_COND },
 	{ 0x78, 2, "LBRN",  LREL,   M6x09_GENERAL },
 	{ 0x79, 2, "LBLS",  LREL,   M6x09_GENERAL, STEP_COND },
-	{ 0x7A, 2, "LBCS",  LREL,   M6x09_GENERAL, STEP_COND },
+	{ 0x7A, 2, "LBLO",  LREL,   M6x09_GENERAL, STEP_COND },
 	{ 0x7B, 2, "LBEQ",  LREL,   M6x09_GENERAL, STEP_COND },
 	{ 0x7C, 2, "LBVS",  LREL,   M6x09_GENERAL, STEP_COND },
 	{ 0x7D, 2, "LBMI",  LREL,   M6x09_GENERAL, STEP_COND },
@@ -1325,7 +1355,7 @@ konami_disassembler::konami_disassembler() : m6x09_base_disassembler(konami_opco
 //  indexed addressing mode for Konami
 //-------------------------------------------------
 
-void konami_disassembler::indexed(std::ostream &stream, uint8_t mode, const data_buffer &params, offs_t &p)
+void konami_disassembler::indexed(std::ostream &stream, uint8_t mode, const data_buffer &params, offs_t &p, uint32_t level)
 {
 	static const char index_reg[8][3] =
 	{
