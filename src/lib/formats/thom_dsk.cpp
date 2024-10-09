@@ -53,7 +53,7 @@ const thomson_525_fd_format::format thomson_525_fd_format::formats[] = {
 		16, 40, 1,
 		128, {},
 		1, {},
-		17, 22, 12
+		27, 11, 27
 	},
 	{}
 };
@@ -188,7 +188,7 @@ const thomson_sap_format::format thomson_sap_format::formats[] = {
 		16, 40, 1,
 		128, {},
 		1, {},
-		17, 22, 12
+		27, 11, 27
 	},
 	{}
 };
