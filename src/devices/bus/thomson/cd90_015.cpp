@@ -10,6 +10,10 @@
 #include "cd90_015.h"
 #include "formats/thom_dsk.h"
 
+#define VERBOSE 0
+
+#include "logmacro.h"
+
 DEFINE_DEVICE_TYPE(CD90_015, cd90_015_device, "cd90_015", "Thomson CD 90-015 Floppy Drive Controller")
 
 cd90_015_device::cd90_015_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
@@ -135,7 +139,7 @@ void cd90_015_device::select_w(u8 data)
 			}
 		}
 
-	logerror("select_w %x\n", m_select);
+	LOG("select_w %x\n", m_select);
 }
 
 u8 cd90_015_device::motor_r()
@@ -145,6 +149,6 @@ u8 cd90_015_device::motor_r()
 		if(m_floppy[i]->get_device() && !m_floppy[i]->get_device()->mon_r())
 			res &= ~(1 << i);
 	if(!machine().side_effects_disabled())
-		logerror("motor_r %x\n", res);
+		LOG("motor_r %x\n", res);
 	return res;
 }

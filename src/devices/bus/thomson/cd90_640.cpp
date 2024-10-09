@@ -10,6 +10,10 @@
 #include "cd90_640.h"
 #include "formats/thom_dsk.h"
 
+#define VERBOSE 0
+
+#include "logmacro.h"
+
 DEFINE_DEVICE_TYPE(CD90_640, cd90_640_device, "cd90_640", "Thomson CD 90-640 Floppy Drive Controller")
 
 cd90_640_device::cd90_640_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
@@ -85,7 +89,7 @@ void cd90_640_device::control_w(u8 data)
 		floppy->ss_w(m_control & 1);
 	m_wd1770->set_floppy(floppy);
 	m_wd1770->dden_w(m_control & 0x80 ? 1 : 0);
-	logerror("control %02x\n", m_control);
+	LOG("control %02x\n", m_control);
 }
 
 u8 cd90_640_device::control_r()
