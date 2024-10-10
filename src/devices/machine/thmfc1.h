@@ -76,7 +76,7 @@ private:
 	required_device_array<thmfc1_connector, 2> m_drive;
 	floppy_image_device *m_cur_floppy;
 	thomson_qdd_image_device *m_cur_qdd;
-	emu_timer *m_timer_motoroff;
+	emu_timer *m_motor_timer[2];
 
 	u64 m_last_sync, m_window_start;
 	int m_state;

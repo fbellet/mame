@@ -68,7 +68,8 @@ void thmfc1_device::map(address_map &map)
 
 void thmfc1_device::device_start()
 {
-	m_timer_motoroff = timer_alloc(FUNC(thmfc1_device::motor_off), this);
+	m_motor_timer[0] = timer_alloc(FUNC(thmfc1_device::motor_off), this);
+	m_motor_timer[1] = timer_alloc(FUNC(thmfc1_device::motor_off), this);
 
 	save_item(NAME(m_cmd0));
 	save_item(NAME(m_cmd1));
@@ -127,8 +128,9 @@ void thmfc1_device::device_reset()
 TIMER_CALLBACK_MEMBER(thmfc1_device::motor_off)
 {
 	LOGREGS("motor off\n");
-	if(m_cur_floppy)
-		m_cur_floppy->mon_w(1);
+	floppy_image_device *floppy = dynamic_cast<floppy_image_device *>(m_drive[param]->get_device());
+	if(floppy)
+		floppy->mon_w(1);
 }
 
 void thmfc1_device::device_post_load()
@@ -242,11 +244,12 @@ void thmfc1_device::cmd2_w(u8 data)
 	if(m_cur_qdd)
 		m_cur_qdd->motor_on_w(m_cmd2 & C2_SISELB);
 	else if(m_cur_floppy) {
+		int i = (m_cmd2 & C2_DRS1 ? 1 : 0);
 		if(m_cmd2 & C2_MTON) {
 			m_cur_floppy->mon_w(0);
-			m_timer_motoroff->adjust(attotime::never);
+			m_motor_timer[i]->adjust(attotime::never);
 		} else if (prev & C2_MTON)
-			m_timer_motoroff->adjust(attotime::from_seconds(2));
+			m_motor_timer[i]->adjust(attotime::from_seconds(2), i);
 		m_cur_floppy->ss_w(m_cmd2 & C2_SISELB ? 0 : 1);
 		m_cur_floppy->dir_w(m_cmd2 & C2_DIRECB ? 0 : 1);
 		m_cur_floppy->stp_w(m_cmd2 & C2_STEP ? 0 : 1);
