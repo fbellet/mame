@@ -159,6 +159,7 @@ std::pair<std::error_condition, std::string> thomson_qdd_image_device::call_load
 	m_disk_present = 1;
 	m_write_protected = (is_readonly() ? 1 : 0);
 	m_byte_offset = 0;
+	m_dirty = false;
 	LOGHW("%s [%d/%d] disk present\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN);
 	LOGHW("%s [%d/%d] write protect is %s\n", machine().time().to_string(),
 			m_byte_offset, QDD_TRACK_LEN, is_readonly() ? "on" : "off");
@@ -183,6 +184,17 @@ static uint8_t get_next_byte(const uint8_t *src, int &pos, bool &eos)
 
 void thomson_qdd_image_device::call_unload()
 {
+	if (m_dirty)
+		save();
+	if(m_track_buffer.get())
+		memset(m_track_buffer.get(), 0, QDD_TRACK_LEN);
+	motor_on_w(0);
+	m_disk_present = 0;
+	LOGHW("%s [%d/%d] media unset\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN);
+}
+
+void thomson_qdd_image_device::save()
+{
 	uint8_t *src = &m_track_buffer[0];
 	int pos = QDD_DATA_RDY_POS;
 
@@ -195,7 +207,7 @@ void thomson_qdd_image_device::call_unload()
 		seek_sync_code(src, pos, SECTOR_HEADER_ID, eos);
 
 		if (eos) {
-			LOGIMG("unload: header id not found for sector %d at pos %d\n", i, pos);
+			LOGIMG("save: header id not found for sector %d at pos %d\n", i, pos);
 			break;
 		}
 
@@ -211,12 +223,12 @@ void thomson_qdd_image_device::call_unload()
 			break;
 
 		if(sect != i) {
-			LOGIMG("unload: invalid header id %d (should be %d) at pos %d\n", sect, i, pos);
+			LOGIMG("save: invalid header id %d (should be %d) at pos %d\n", sect, i, pos);
 			break;
 		}
 
 		if(crc != b3) {
-			LOGIMG("unload: invalid header crc 0x%02x (should be 0x%02x) for sector %d at pos %d\n", b3, crc, i, pos);
+			LOGIMG("save: invalid header crc 0x%02x (should be 0x%02x) for sector %d at pos %d\n", b3, crc, i, pos);
 			break;
 		}
 
@@ -229,7 +241,7 @@ void thomson_qdd_image_device::call_unload()
 		seek_sync_code(src, pos, SECTOR_DATA_ID, eos);
 
 		if (eos) {
-			LOGIMG("unload: data id not found for sector %d at pos %d\n", i, pos);
+			LOGIMG("save: data id not found for sector %d at pos %d\n", i, pos);
 			break;
 		}
 
@@ -245,7 +257,7 @@ void thomson_qdd_image_device::call_unload()
 		fseek(QDD_SECTOR_LENGTH*thomson_qdd_map[i - 1], SEEK_SET);
 		fwrite(&src[p1 + 1], QDD_SECTOR_LENGTH);
 		if(b1 != crc) {
-			LOGIMG("unload: invalid data crc 0x%02x (should be 0x%02x) for sector %d at pos %d\n", b1, crc, i, pos);
+			LOGIMG("save: invalid data crc 0x%02x (should be 0x%02x) for sector %d at pos %d\n", b1, crc, i, pos);
 			break;
 		}
 
@@ -255,17 +267,11 @@ void thomson_qdd_image_device::call_unload()
 		//if(get_next_byte(src, pos, eos) != SYNC_CODE)
 		//	break;
 
-		LOGIMG("unload: sector %d header [ %d .. %d ] data [ %d .. %d ]\n", i,
+		LOGIMG("save: sector %d header [ %d .. %d ] data [ %d .. %d ]\n", i,
 				p0, p0 + 3,	// header
 				p1, p1 + 129);	// data
 	}
-	LOGIMG("unload: ready range [ %d .. %d ]\n", QDD_HEAD_READ_SW_POS, QDD_MOTOR_STOP_SW_POS);
-
-	if(m_track_buffer.get())
-		memset(m_track_buffer.get(), 0, QDD_TRACK_LEN);
-	motor_on_w(0);
-	m_disk_present = 0;
-	LOGHW("%s [%d/%d] media unset\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN);
+	LOGIMG("save: ready range [ %d .. %d ]\n", QDD_HEAD_READ_SW_POS, QDD_MOTOR_STOP_SW_POS);
 }
 
 void thomson_qdd_image_device::write(uint8_t data)
@@ -275,6 +281,7 @@ void thomson_qdd_image_device::write(uint8_t data)
 		LOGWRITE("%s [%d/%d] write 0x%02x replace=0x%02x to the QDD\n", machine().time().to_string(),
 				m_byte_offset, QDD_TRACK_LEN, data, m_track_buffer[m_byte_offset]);
 		m_track_buffer[m_byte_offset] = data;
+		m_dirty = true;
 		if (m_byte_offset != prev + 1)
 			LOGREAD("%s WARNING gap between two writes %d %d\n", machine().time().to_string(),
 				prev, m_byte_offset);
@@ -330,6 +337,8 @@ TIMER_CALLBACK_MEMBER(thomson_qdd_image_device::byte_timer)
 	if(m_byte_offset >= QDD_MOTOR_STOP_SW_POS && m_motor_cmd == 1 && (m_motor_on == 0 || m_write_gate == 1)) {
 		m_motor_cmd = 0;
 		LOGHW("%s [%d/%d] motor_cmd set off\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN);
+		if (m_dirty)
+			save();
 	}
 	m_byte_offset++;
 	if(m_byte_offset == QDD_TRACK_LEN) {

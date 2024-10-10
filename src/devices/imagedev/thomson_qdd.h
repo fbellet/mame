@@ -53,6 +53,7 @@ protected:
 	// device_t implementation
 	virtual void device_start() override;
 	virtual void device_reset() override;
+	void save();
 
 	TIMER_CALLBACK_MEMBER(byte_timer);
 
@@ -67,6 +68,7 @@ private:
 	int m_ready;
 	int m_write_gate;
 	int m_write_protected;
+	int m_dirty;
 
 	emu_timer *m_byte_timer;
 };
