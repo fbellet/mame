@@ -16,6 +16,11 @@
 
 #include <cstring>
 
+#define VERBOSE 1
+
+#ifndef LOG_FORMATS
+#define LOG_FORMATS(...) do { if (VERBOSE) osd_printf_info(__VA_ARGS__); } while (false)
+#endif
 
 wd177x_format::wd177x_format(const format *_formats)
 {
@@ -511,9 +516,11 @@ void wd177x_format::extract_sectors(const floppy_image &image, const format &f, 
 	switch (f.encoding)
 	{
 	case floppy_image::FM:
+		LOG_FORMATS("extract_sectors: h=%d t=%d mode=FM\n", head, track);
 		sectors = extract_sectors_from_bitstream_fm_pc(bitstream);
 		break;
 	case floppy_image::MFM:
+		LOG_FORMATS("extract_sectors: h=%d t=%d mode=MFM\n", head, track);
 		sectors = extract_sectors_from_bitstream_mfm_pc(bitstream);
 		break;
 	}

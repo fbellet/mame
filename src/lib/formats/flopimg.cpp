@@ -12,6 +12,7 @@
 
 #include "ioprocs.h"
 #include "multibyte.h"
+#include "osdcore.h"
 #include "strformat.h"
 
 #include <algorithm>
@@ -21,6 +22,11 @@
 #include <stdexcept>
 #include <utility>
 
+#define VERBOSE 0
+
+#ifndef LOG_FORMATS
+#define LOG_FORMATS(...) do { if (VERBOSE) osd_printf_info(__VA_ARGS__); } while (false)
+#endif
 
 floppy_image::floppy_image(int _tracks, int _heads, uint32_t _form_factor)
 {
@@ -134,7 +140,7 @@ bool floppy_image::track_is_formatted(int track, int head, int subtrack) const n
 	return false;
 }
 
-const char *floppy_image::get_variant_name(uint32_t form_factor, uint32_t variant) noexcept
+const char *floppy_image::get_variant_name(uint32_t variant) noexcept
 {
 	switch(variant) {
 	case SSSD:   return "Single side, single density";
@@ -161,6 +167,27 @@ const char *floppy_image::get_variant_name(uint32_t form_factor, uint32_t varian
 	case DSQD16: return "Double side, quad density, 16 hard sector";
 	case DSHD:   return "Double side, high density";
 	case DSED:   return "Double side, extended density";
+	}
+	return "Unknown";
+}
+
+const char *floppy_image::get_form_factor_name(uint32_t form_factor) noexcept
+{
+	switch(form_factor) {
+	case FF_3:   return "3 inch disk";
+	case FF_35:  return "3.5 inch disk";
+	case FF_525: return "5.25 inch disk";
+	case FF_8:   return "8 inch disk";
+	}
+	return "Unknown";
+}
+
+const char *floppy_image::get_encoding_name(uint32_t encoding) noexcept
+{
+	switch(encoding) {
+	case FM:   return "FM";
+	case MFM:  return "MFM";
+	case M2FM: return "M2FM";
 	}
 	return "Unknown";
 }
@@ -1623,6 +1650,7 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 		if(shift_reg == 0x4489) {
 			uint16_t header;
 			uint32_t pos = i+1;
+			LOG_FORMATS("%5d 4489\n", i);
 			do {
 				header = 0;
 				for(int j=0; j<16; j++)
@@ -1636,14 +1664,18 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 
 			// fe, ff
 			if(header == 0x5554 || header == 0x5555) {
-				if(idblk_count < 100)
+				if(idblk_count < 100) {
+					LOG_FORMATS("%5d %04x idblk[%d]\n", pos, header, idblk_count);
 					idblk[idblk_count++] = pos;
+				}
 				i = pos-1;
 			}
 			// f8, f9, fa, fb
 			if(header == 0x554a || header == 0x5549 || header == 0x5544 || header == 0x5545) {
-				if(dblk_count < 100)
+				if(dblk_count < 100) {
+					LOG_FORMATS("%5d %04x dblk[%d]\n", pos, header, dblk_count);
 					dblk[dblk_count++] = pos;
+				}
 				i = pos-1;
 			}
 		}
@@ -1656,6 +1688,7 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 		[[maybe_unused]] uint8_t head = sbyte_mfm_r(bitstream, pos);
 		uint8_t sector = sbyte_mfm_r(bitstream, pos);
 		uint8_t size = sbyte_mfm_r(bitstream, pos);
+		LOG_FORMATS("idblk[%d] h=%d t=%d s=%d ssz=%d\n", i, head, track, sector, 128 << size);
 
 		if(size >= 8)
 			continue;
@@ -1713,6 +1746,7 @@ void floppy_image_format_t::get_geometry_mfm_pc(const floppy_image &image, int c
 void floppy_image_format_t::get_track_data_mfm_pc(int track, int head, const floppy_image &image, int cell_size, int sector_size, int sector_count, uint8_t *sectdata)
 {
 	auto bitstream = generate_bitstream_from_track(track, head, cell_size, image);
+	LOG_FORMATS("head=%d track=%d sector_count=%d mode=MFM\n", head, track, sector_count);
 	auto sectors = extract_sectors_from_bitstream_mfm_pc(bitstream);
 	for(int sector=1; sector <= sector_count; sector++) {
 		uint8_t *sd = sectdata + (sector-1)*sector_size;
@@ -1761,14 +1795,18 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 
 		// fe
 		if(shift_reg == 0xf57e) {       // address mark
-			if(idblk_count < 100)
+			if(idblk_count < 100) {
+				LOG_FORMATS("%5d %04x idblk[%d]\n", i+1, shift_reg, idblk_count);
 				idblk[idblk_count++] = i+1;
+			}
 		}
 		// f8, f9, fa, fb
 		if(shift_reg == 0xf56a || shift_reg == 0xf56b ||
 			shift_reg == 0xf56e || shift_reg == 0xf56f) {       // data mark
-			if(dblk_count < 100)
+			if(dblk_count < 100) {
+				LOG_FORMATS("%5d %04x dblk[%d]\n", i+1, shift_reg, dblk_count);
 				dblk[dblk_count++] = i+1;
+			}
 		}
 	}
 
@@ -1779,6 +1817,7 @@ std::vector<std::vector<uint8_t>> floppy_image_format_t::extract_sectors_from_bi
 		[[maybe_unused]] uint8_t head = sbyte_mfm_r(bitstream, pos);
 		uint8_t sector = sbyte_mfm_r(bitstream, pos);
 		uint8_t size = sbyte_mfm_r(bitstream, pos);
+		LOG_FORMATS("idblk[%d] h=%d t=%d s=%d ssz=%d\n", i, head, track, sector, 128 << size);
 		if(size >= 8)
 			continue;
 		int ssize = 128 << size;
@@ -1834,6 +1873,7 @@ void floppy_image_format_t::get_geometry_fm_pc(const floppy_image &image, int ce
 void floppy_image_format_t::get_track_data_fm_pc(int track, int head, const floppy_image &image, int cell_size, int sector_size, int sector_count, uint8_t *sectdata)
 {
 	auto bitstream = generate_bitstream_from_track(track, head, cell_size, image);
+	LOG_FORMATS("head=%d track=%d sector_count=%d mode=FM\n", head, track, sector_count);
 	auto sectors = extract_sectors_from_bitstream_fm_pc(bitstream);
 	for(unsigned int sector=1; sector < sector_count; sector++) {
 		uint8_t *sd = sectdata + (sector-1)*sector_size;

@@ -17,9 +17,13 @@ public:
   virtual const char *extensions() const noexcept override;
 
   int get_image_offset(const format &f, int head, int track) const override;
+  virtual int identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const override;
+  virtual int find_size(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const override;
 
 private:
   static const format formats[];
+  bool validate_fat(util::random_read &io, const format &f) const;
+  bool validate_catalog(util::random_read &io, const format &f) const;
 };
 
 class thomson_35_fd_format : public wd177x_format

@@ -638,11 +638,20 @@ public:
 	//! @return whether a given track is formatted
 	bool track_is_formatted(int track, int head, int subtrack = 0) const noexcept;
 
-	//! Returns the variant name for the particular disk form factor/variant
-	//! @param form_factor
+	//! Returns the variant name for the particular variant
 	//! @param variant
 	//! @return a string containing the variant name.
-	static const char *get_variant_name(uint32_t form_factor, uint32_t variant) noexcept;
+	static const char *get_variant_name(uint32_t variant) noexcept;
+
+	//! Returns the form_factor name for the particular form_factor
+	//! @param form_factor
+	//! @return a string containing the form_factor name.
+	static const char *get_form_factor_name(uint32_t form_factor) noexcept;
+
+	//! Returns the encoding name for the particular encoding
+	//! @param encoding
+	//! @return a string containing the encoding name.
+	static const char *get_encoding_name(uint32_t encoding) noexcept;
 
 private:
 	int tracks, heads;

@@ -188,45 +188,71 @@ static thom_floppy *get_thom_floppy(imgtool::image &image)
    (.fd have 40 or 80 tracks, .qd have 25 tracks) and the file size.
 */
 
+// Function copied from thomson_525_fd_format::validate_fat()
+// in thom_dsk.cpp. See comments there.
 static bool validate_fat(thom_floppy *f)
 {
+	int nblocks = (f->tracks * 2 < f->sector_size - 1 ? f->tracks * 2 : f->sector_size - 1);
 	for (int head = 0; head < f->heads ; head++) {
 		uint8_t* fat = thom_get_sector( f, head, 20, 2 );
-		int nblocks = (f->tracks * 2 < f->sector_size - 1 ? f->tracks * 2 : f->sector_size - 1);
 		if (fat[0])
 			return false;
-		for (int i = 1; i <= nblocks; i++)
+		if (fat[41] != 0xfe)
+			return false;
+		if (fat[42] != 0xfe)
+			return false;
+		for (int i = 1; i <= nblocks; i++) {
 			if (fat[i] > 0xc8 && fat[i] < 0xfe)
 			    return false;
+			if (fat[i] >= nblocks && fat[i] < 0xc1)
+				return false;
+		}
 	}
 	return true;
 }
 
+// Function copied from thomson_525_fd_format::validate_cat()
+// in thom_dsk.cpp. See comments there.
 static bool validate_catalog(thom_floppy *f)
 {
+	int nblocks = (f->tracks * 2 < f->sector_size - 1 ? f->tracks * 2 : f->sector_size - 1);
 	for (int head = 0; head < f->heads ; head++) {
 		bool end_of_catalog = false;
 		for (int sect = 3; sect <= 16; sect++) {
 			uint8_t* cat = thom_get_sector( f, head, 20, sect );
 			for (int i = 0; i < f->sector_size; i += 32) {
+				bool end_of_filename = false;
+				bool end_of_suffix = false;
 				if (end_of_catalog) {
 					if (cat[i] < 0xff)
 						return false;
 					continue;
 				}
+				if (cat[i] == 0)
+					continue;
 				if (cat[i] == 0xff) {
 					end_of_catalog = true;
 					continue;
 				}
-				if (cat[i] > 0 && cat[i] < 0x20)
+				for (int j=i; j < i+8; j++) {
+					if (cat[j] < 0x20 || cat[j] > 0x7f)
+						return false;
+					if (end_of_filename && cat[j] != 0x20)
+						return false;
+					end_of_filename = (cat[j] == 0x20);
+				}
+				for (int j=i+8; j < i+11; j++) {
+					if (cat[j] < 0x20 || cat[j] > 0x7f)
+						return false;
+					if (end_of_suffix && cat[j] != 0x20)
+						return false;
+					end_of_suffix = (cat[j] == 0x20);
+				}
+				if (cat[i + 11] > 3)
 					return false;
-				if (cat[i] > 0x7f && cat[i] < 0xff)
+				if (cat[i + 12] > 0 && cat[i + 12] < 0xff)
 					return false;
-				if (cat[i + 0xb] > 3)
-					return false;
-				if (cat[i + 0xc] > 0 && cat[i + 0x0c] < 0xff)
-					return false;
-				if (cat[i + 0xd] >= (f->tracks * 2))
+				if (cat[i + 13] >= nblocks)
 					return false;
 			}
 		}
@@ -268,6 +294,13 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	case 163840:
+		// floppy_image::FF_525, floppy_image::DSSD
+		f->tracks = 40;
+		f->sector_size = 128;
+		f->sectuse_size = 128;
+		f->heads = 2;
+		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+
 		// floppy_image::FF_525, floppy_image::SSDD
 		f->tracks = 40;
 		f->sector_size = 256;
@@ -302,7 +335,7 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	case 655360:
-		// floppy_image::FF_35, floppy_image::DSDD 16, 80, 2, 256
+		// floppy_image::FF_35, floppy_image::DSDD
 		f->tracks = 80;
 		f->sector_size = 256;
 		f->sectuse_size = 255;

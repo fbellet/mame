@@ -1887,6 +1887,7 @@ void floppy_35_dd::setup_characteristics()
 
 	add_variant(floppy_image::SSSD);
 	add_variant(floppy_image::SSDD);
+	add_variant(floppy_image::DSSD);
 	add_variant(floppy_image::DSDD);
 }
 
@@ -2106,6 +2107,7 @@ void floppy_525_dd::setup_characteristics()
 
 	add_variant(floppy_image::SSSD);
 	add_variant(floppy_image::SSDD);
+	add_variant(floppy_image::DSSD);
 	add_variant(floppy_image::DSDD);
 }
 
