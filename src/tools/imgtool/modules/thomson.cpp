@@ -135,6 +135,7 @@ struct thom_floppy {
 	uint8_t  data[MAXSIZE];    /* image data */
 
 	int    modified;           /* data need to be copied back to image file */
+	uint8_t part;              /* current side/partition used by imgtool */
 
 };
 
@@ -281,6 +282,7 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 
 	f->stream = stream.get();
 	f->modified = 0;
+	f->part = 0;
 
 	/* guess format */
 	switch ( size ) {
@@ -1030,12 +1032,10 @@ static imgtoolerr_t thom_write_sector(imgtool::image &img, uint32_t track,
 }
 
 /* returns floopy name */
-/* actually, each side has its own name, but we only return the one on side 0.
- */
 static void thom_info(imgtool::image &img, std::ostream &stream)
 {
 	thom_floppy* f = get_thom_floppy(img);
-	uint8_t* base = thom_get_sector( f, 0, 20, 1 );
+	uint8_t* base = thom_get_sector( f, f->part, 20, 1 );
 	char buf[9];
 	memcpy( buf, base, 8 );
 	buf[8] = 0;
@@ -1064,6 +1064,7 @@ static imgtoolerr_t thom_open_partition(imgtool::partition &part,
 	if ( first_block >= f->heads )
 	return IMGTOOLERR_INVALIDPARTITION;
 	* ( (int*) part.extra_bytes() ) = first_block;
+	f->part = first_block;
 	return IMGTOOLERR_SUCCESS;
 }
 
@@ -1303,38 +1304,45 @@ static imgtoolerr_t thom_create(imgtool::image &img,
 	thom_floppy* f = get_thom_floppy(img);
 	int i;
 	uint8_t* buf;
-	const char* name;
+	const char* name[2];
 
 	f->stream = stream.get();
 	f->modified = 0;
-	f->sector_size[1] = 0;
-	f->sectuse_size[1] = 0;
 
 	/* get parameters */
 	f->heads = opts->lookup_int('H');
 	f->tracks = opts->lookup_int('T');
-	name = opts->lookup_string('N').c_str();
-	switch ( opts->lookup_int('D') ) {
+	name[0] = opts->lookup_string('N').c_str();
+	name[1] = opts->lookup_string('n').c_str();
+	switch ( opts->lookup_int('D') ) { // Density side 0
 	case 0:
 		f->sector_size[0] = 128;
 		f->sectuse_size[0] = 128;
-		if (f->heads > 1) {
-			f->sector_size[1] = 128;
-			f->sectuse_size[1] = 128;
-		}
 		break;
 	case 1:
 		f->sector_size[0] = 256;
 		f->sectuse_size[0] = 255;
-		if (f->heads > 1) {
-			f->sector_size[1] = 256;
-			f->sectuse_size[1] = 255;
-		}
 		break;
 	default: return IMGTOOLERR_PARAMCORRUPT;
 	}
+
+	switch ( opts->lookup_int('d') ) { // Density side 1
+	case 0:
+		f->sector_size[1] = 128;
+		f->sectuse_size[1] = 128;
+		break;
+	case 1:
+		f->sector_size[1] = 256;
+		f->sectuse_size[1] = 255;
+		break;
+	}
+	if (f->heads == 1) {
+		f->sector_size[1] = 0;
+		f->sectuse_size[1] = 0;
+	}
 #ifdef IMGTOOL_DEBUG
-	util::stream_format(std::wcout, L"thom_create: sector_size=%d for selected density\n", f->sector_size[0]);
+	util::stream_format(std::wcout, L"thom_create: sector_size={%d,%d} for selected density\n",
+			f->sector_size[0], f->sector_size[1]);
 #endif
 
 	/* sanity checks */
@@ -1369,8 +1377,8 @@ static imgtoolerr_t thom_create(imgtool::image &img,
 	/* disk info */
 	buf = thom_get_sector( f, i, 20, 1 );
 	memset( buf, 0xff, f->sector_size[i] );
-	if ( name ) {
-		strncpy( (char*)buf, name, 8 );
+	if ( name[i] ) {
+		strncpy( (char*)buf, name[i], 8 );
 		thom_unstringity( (char*)buf, 8 );
 	}
 	else memset( buf, ' ', 8 );
@@ -2168,11 +2176,16 @@ FILTER( thombas128,
 OPTION_GUIDE_START( thom_createimage_optguide )
 	OPTION_INT( 'H', "heads", "Heads" )
 	OPTION_INT( 'T', "tracks", "Tracks" )
-	OPTION_ENUM_START( 'D', "density", "Density" )
+	OPTION_ENUM_START( 'D', "density", "Density side 0" )
 	OPTION_ENUM( 0, "SD", "Single density (128 bytes)" )
 	OPTION_ENUM( 1, "DD", "Double density (256 bytes)" )
 	OPTION_ENUM_END
-	OPTION_STRING( 'N', "name", "Floppy name" )
+	OPTION_ENUM_START( 'd', "density1", "Density side 1" )
+	OPTION_ENUM( 0, "SD", "Single density (128 bytes)" )
+	OPTION_ENUM( 1, "DD", "Double density (256 bytes)" )
+	OPTION_ENUM_END
+	OPTION_STRING( 'N', "name", "Floppy name side 0" )
+	OPTION_STRING( 'n', "name1", "Floppy name side 1" )
 OPTION_GUIDE_END
 
 OPTION_GUIDE_START( thom_writefile_optguide )
@@ -2269,7 +2282,7 @@ void thom_fd_basic_get_info(const imgtool_class *clas,
 	case IMGTOOLINFO_PTR_CLOSE:
 		info->close = thom_close_fd_qd; break;
 	case IMGTOOLINFO_STR_CREATEIMAGE_OPTSPEC:
-		strcpy( info->s = imgtool_temp_str(), "H[1]-2;T40/[80];D0-[1];N" ); break;
+		strcpy( info->s = imgtool_temp_str(), "H[1]-2;T40/[80];D0-[1];d0-[1];N;n" ); break;
 	default:
 		thom_basic_get_info( clas, param, info );
 	}
@@ -2293,7 +2306,7 @@ void thom_qd_basic_get_info(const imgtool_class *clas,
 	case IMGTOOLINFO_PTR_CLOSE:
 		info->close = thom_close_fd_qd; break;
 	case IMGTOOLINFO_STR_CREATEIMAGE_OPTSPEC:
-		strcpy( info->s = imgtool_temp_str(), "H[1]-2;T[25];D[0];N" ); break;
+		strcpy( info->s = imgtool_temp_str(), "H[1];T[25];D[0];N" ); break;
 	default:
 		thom_basic_get_info( clas, param, info );
 	}
