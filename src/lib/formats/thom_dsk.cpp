@@ -11,7 +11,217 @@
 #define LOG_FORMATS(...) do { if (VERBOSE) osd_printf_info(__VA_ARGS__); } while (false)
 #endif
 
-thomson_525_fd_format::thomson_525_fd_format() : wd177x_format(formats)
+thomson_fd_format::thomson_fd_format(const format *formats) : wd177x_format(formats)
+{
+}
+
+bool thomson_fd_format::validate_fat(util::random_read &io, const format &f, int offset) const
+{
+	// Basic Microsoft FAT representation (track 20, sector 2)
+	//   $ff: unallocated
+	//   $fe: reserved
+	//   <$c0: allocated block
+	//   >$c0 and <$c9: last block
+	int nblocks = (f.track_count * 2 < f.sector_base_size - 1 ? f.track_count * 2 : f.sector_base_size - 1);
+	uint8_t fat[256];
+	read_at(io, offset + (20 * f.sector_count + 1) * f.sector_base_size, fat, f.sector_base_size);
+	// offset 0 is always zero
+	if (fat[0])
+		return false;
+	 // offsets 41 and 42 are reserved: two blocks for FAT
+	if (fat[41] != 0xfe)
+		return false;
+	if (fat[42] != 0xfe)
+		return false;
+	for(int i = 1; i <= nblocks; i++) {
+		if (fat[i] > 0xc8 && fat[i] < 0xfe)
+			return false;
+		// - value $c0 is not possible (the last block contains at least one sector)
+		// - value should be bound by the number of blocks
+		if (fat[i] >= nblocks && fat[i] < 0xc1)
+			return false;
+	}
+	return true;
+}
+
+bool thomson_fd_format::validate_catalog(util::random_read &io, const format &f, int offset) const
+{
+	// Basic Microsoft catalog representation (track 20, sector 3 to 15)
+	// A file descriptor uses 32 bytes:
+	//  - offset 0: (0 unallocated entry, $20-$7f allocated entry, $ff end of catalog
+	//  - offset 0-7: filename, left centered, completed by spaces
+	//  - offset 8-10: extension
+	//  - offset 11: file type (0, 1, 2, 3)
+	//  - offset 12: $ff for ascii, 0 for binary
+	//  - offset 13: first block
+	//  - offset 14-15: number of bytes in the last sector
+	//  - offset 16-23: comments
+	//  - offset 24-31: reserved
+
+	int nblocks = (f.track_count * 2 < f.sector_base_size - 1 ? f.track_count * 2 : f.sector_base_size - 1);
+	bool end_of_catalog = false;
+	for(int sect=2; sect < 16; sect++) {
+		uint8_t cat[256];
+		read_at(io, offset + (20 * f.sector_count + sect) * f.sector_base_size, cat, f.sector_base_size);
+		for(int i=0; i < f.sector_base_size; i += 32) {
+			bool end_of_filename = false;
+			bool end_of_suffix = false;
+			if (end_of_catalog) {
+				if (cat[i] < 0xff)
+					return false;
+				continue;
+			}
+			if (cat[i] == 0)
+				continue;
+			if (cat[i] == 0xff) {
+				end_of_catalog = true;
+				continue;
+			}
+			for(int j=i; j < i+8; j++) {
+				if (cat[j] < 0x20 || cat[j] > 0x7f)
+					return false;
+				if (end_of_filename && cat[j] != 0x20)
+					return false;
+				end_of_filename = (cat[j] == 0x20);
+			}
+			for(int j=i+8; j < i+11; j++) {
+				if (cat[j] < 0x20 || cat[j] > 0x7f)
+					return false;
+				if (end_of_suffix && cat[j] != 0x20)
+					return false;
+				end_of_suffix = (cat[j] == 0x20);
+			}
+			if (cat[i + 11] > 3)
+				return false;
+			if (cat[i + 12] > 0 && cat[i + 12] < 0xff)
+				return false;
+			if (cat[i + 13] >= nblocks)
+				return false;
+		}
+	}
+	return true;
+}
+
+int thomson_fd_format::find_size(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
+{
+	uint64_t size;
+	if(io.length(size))
+		return -1;
+
+	for(int i=0; formats[i].form_factor; i++) {
+		const format &f = get_track_format(formats[i], 0, 0);;
+		int head;
+		int track_size = 0;
+		for(head=0; head < f.head_count; head++) {
+			const format &tf = get_track_format(formats[i], head, 0);;
+			if(form_factor != floppy_image::FF_UNKNOWN && form_factor != tf.form_factor)
+				break;;
+			if(!variants.empty() && !has_variant(variants, tf.variant))
+				break;
+			if(!validate_fat(io, tf, track_size))
+				break;
+			if(!validate_catalog(io, tf, track_size))
+				break;
+			track_size += (tf.track_count * tf.sector_base_size * tf.sector_count);
+		}
+		if(head < f.head_count)
+			continue;
+		if(size != track_size)
+			continue;
+		for(int head=0; head < f.head_count; head++) {
+			const format &tf = get_track_format(formats[i], head, 0);;
+			LOG_FORMATS("find_size: identified %s, %s, %s for head %d with size %d\n",
+					floppy_image::get_form_factor_name(tf.form_factor),
+					tf.variant == floppy_image::SSDD || tf.variant == floppy_image::DSDD ? "DD" : "SD",
+					floppy_image::get_encoding_name(tf.encoding), head,
+					tf.track_count * tf.sector_base_size * tf.sector_count);
+		}
+		return i;
+	}
+	LOG_FORMATS("find_size: unidentified for size %d\n", size);
+	return -1;
+}
+
+int thomson_fd_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
+{
+	int const type = find_size(io, form_factor, variants);
+
+	if(type != -1)
+		return FIFID_SIZE | FIFID_STRUCT;
+
+	return 0;
+}
+
+int thomson_fd_format::get_image_offset(const format &f, int head, int track) const
+{
+	int offset = 0;
+
+	for(int hd=0; hd < head; hd++) {
+		for(int trk=0; trk < f.track_count; trk++) {
+			const format &tf = get_track_format(f, hd, trk);
+			offset += compute_track_size(tf);
+		}
+	}
+
+	for(int trk=0; trk < track; trk++) {
+		const format &tf = get_track_format(f, head, trk);
+		offset += compute_track_size(tf);
+	}
+
+	return offset;
+}
+
+const wd177x_format::format &thomson_fd_format::get_track_format(const format &f, int head, int track) const
+{
+	int n = -1;
+	for(int i = 0; formats[i].form_factor; i++) {
+		if(&formats[i] == &f) {
+			n = i;
+			break;
+		}
+	}
+	if(n < 0) {
+		LOG_FORMATS("Error format not found\n");
+		return f;
+	}
+	if(head >= f.head_count) {
+		LOG_FORMATS("Error invalid head %d\n", head);
+		return f;
+	}
+	if(track >= f.track_count) {
+		LOG_FORMATS("Error invalid track %d\n", track);
+		return f;
+	}
+	if(n==1 && head==1) // DS, DD on side 0, SD on side 1
+		n=3;
+	if(n==4 && head==1) // DS, SD on side 0, DD on side 1
+		n=0;
+	return formats[n];
+}
+
+floppy_image_format_t::desc_e* thomson_fd_format::get_desc_fm(const format &f, int &current_size, int &end_gap_index) const
+{
+	floppy_image_format_t::desc_e *desc = wd177x_format::get_desc_fm(f, current_size, end_gap_index);
+
+	// The format description differs from the wd177x format:
+	// the head id is always zero (in field 6)
+	desc[6] = { FM, 0x00, 1 };
+
+	return desc;
+}
+
+floppy_image_format_t::desc_e* thomson_fd_format::get_desc_mfm(const format &f, int &current_size, int &end_gap_index) const
+{
+	floppy_image_format_t::desc_e *desc = wd177x_format::get_desc_mfm(f, current_size, end_gap_index);
+
+	// The format description differs from the wd177x format:
+	// the head id is always zero (in field 7)
+	desc[7] = { MFM, 0x00, 1 };
+
+	return desc;
+}
+
+thomson_525_fd_format::thomson_525_fd_format() : thomson_fd_format(formats)
 {
 }
 
@@ -39,6 +249,14 @@ const thomson_525_fd_format::format thomson_525_fd_format::formats[] = {
 		1, {},
 		31, 22, 44
 	},
+	{	// DS, DD on side 0, SD on side 1
+		floppy_image::FF_525, floppy_image::DSDD, floppy_image::MFM,
+		2000,
+		16, 40, 2,
+		256, {},
+		1, {},
+		31, 22, 44
+	},
 	{
 		floppy_image::FF_525, floppy_image::SSDD, floppy_image::MFM,
 		2000,
@@ -48,6 +266,14 @@ const thomson_525_fd_format::format thomson_525_fd_format::formats[] = {
 		31, 22, 44
 	},
 	{
+		floppy_image::FF_525, floppy_image::DSSD, floppy_image::FM,
+		4000,
+		16, 40, 2,
+		128, {},
+		1, {},
+		27, 11, 27
+	},
+	{	// DS, SD on side 0, DD on side 1
 		floppy_image::FF_525, floppy_image::DSSD, floppy_image::FM,
 		4000,
 		16, 40, 2,
@@ -66,138 +292,7 @@ const thomson_525_fd_format::format thomson_525_fd_format::formats[] = {
 	{}
 };
 
-int thomson_525_fd_format::get_image_offset(const format &f, int head, int track) const
-{
-	return (track + (head ? f.track_count : 0)) * compute_track_size(f);
-}
-
-bool thomson_525_fd_format::validate_fat(util::random_read &io, const format &f) const
-{
-	// Basic Microsoft FAT representation (track 20, sector 2)
-	//   $ff: unallocated
-	//   $fe: reserved
-	//   <$c0: allocated block
-	//   >$c0 and <$c9: last block
-	int nblocks = (f.track_count * 2 < f.sector_base_size - 1 ? f.track_count * 2 : f.sector_base_size - 1);
-	for (int head=0; head < f.head_count; head++) {
-		uint8_t fat[256];
-		read_at(io, ((head * f.track_count + 20) * 16 + 1) * f.sector_base_size, fat, f.sector_base_size);
-		// offset 0 is always zero
-		if (fat[0])
-			return false;
-		 // offsets 41 and 42 are reserved: two blocks for FAT
-		if (fat[41] != 0xfe)
-			return false;
-		if (fat[42] != 0xfe)
-			return false;
-		for (int i = 1; i <= nblocks; i++) {
-			if (fat[i] > 0xc8 && fat[i] < 0xfe)
-				return false;
-			// - value $c0 is not possible (the last block contains at least one sector)
-			// - value should be bound by the number of blocks
-			if (fat[i] >= nblocks && fat[i] < 0xc1)
-				return false;
-		}
-	}
-	return true;
-}
-
-bool thomson_525_fd_format::validate_catalog(util::random_read &io, const format &f) const
-{
-	// Basic Microsoft catalog representation (track 20, sector 3 to 15)
-	// A file descriptor uses 32 bytes:
-	//  - offset 0: (0 unallocated entry, $20-$7f allocated entry, $ff end of catalog
-	//  - offset 0-7: filename, left centered, completed by spaces
-	//  - offset 8-10: extension
-	//  - offset 11: file type (0, 1, 2, 3)
-	//  - offset 12: $ff for ascii, 0 for binary
-	//  - offset 13: first block
-	//  - offset 14-15: number of bytes in the last sector
-	//  - offset 16-23: comments
-        //  - offset 24-31: reserved
-
-	int nblocks = (f.track_count * 2 < f.sector_base_size - 1 ? f.track_count * 2 : f.sector_base_size - 1);
-	for (int head = 0; head < f.head_count ; head++) {
-		bool end_of_catalog = false;
-		for (int sect=2; sect < 16; sect++) {
-			uint8_t cat[256];
-			read_at(io, ((head * f.track_count + 20) * 16 + sect) * f.sector_base_size, cat, f.sector_base_size);
-			for (int i=0; i < f.sector_base_size; i += 32) {
-				bool end_of_filename = false;
-				bool end_of_suffix = false;
-				if (end_of_catalog) {
-					if (cat[i] < 0xff)
-						return false;
-					continue;
-				}
-				if (cat[i] == 0)
-					continue;
-				if (cat[i] == 0xff) {
-					end_of_catalog = true;
-					continue;
-				}
-				for (int j=i; j < i+8; j++) {
-					if (cat[j] < 0x20 || cat[j] > 0x7f)
-						return false;
-					if (end_of_filename && cat[j] != 0x20)
-						return false;
-					end_of_filename = (cat[j] == 0x20);
-				}
-				for (int j=i+8; j < i+11; j++) {
-					if (cat[j] < 0x20 || cat[j] > 0x7f)
-						return false;
-					if (end_of_suffix && cat[j] != 0x20)
-						return false;
-					end_of_suffix = (cat[j] == 0x20);
-				}
-				if (cat[i + 11] > 3)
-					return false;
-				if (cat[i + 12] > 0 && cat[i + 12] < 0xff)
-					return false;
-				if (cat[i + 13] >= nblocks)
-					return false;
-			}
-		}
-	}
-	return true;
-}
-
-int thomson_525_fd_format::find_size(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
-{
-	uint64_t size;
-	if(io.length(size))
-		return -1;
-	for(int i=0; formats[i].form_factor; i++) {
-		const format &f = formats[i];
-		if(form_factor != floppy_image::FF_UNKNOWN && form_factor != f.form_factor)
-			continue;
-		if(!variants.empty() && !has_variant(variants, f.variant))
-			continue;
-		if(size != f.head_count * f.track_count * f.sector_base_size * f.sector_count)
-			continue;
-		if(!validate_fat(io, f))
-			continue;
-		if(!validate_catalog(io, f))
-			continue;
-		LOG_FORMATS("find_size: identified %s, %s, %s for size %d\n", floppy_image::get_form_factor_name(f.form_factor),
-				floppy_image::get_variant_name(f.variant), floppy_image::get_encoding_name(f.encoding), size);
-		return i;
-	}
-	LOG_FORMATS("find_size: unidentified for size %d\n", size);
-	return -1;
-}
-
-int thomson_525_fd_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
-{
-	int const type = find_size(io, form_factor, variants);
-
-	if(type != -1)
-		return FIFID_SIZE | FIFID_STRUCT;
-
-	return 0;
-}
-
-thomson_35_fd_format::thomson_35_fd_format() : wd177x_format(formats)
+thomson_35_fd_format::thomson_35_fd_format() : thomson_fd_format(formats)
 {
 }
 
@@ -227,6 +322,14 @@ const thomson_35_fd_format::format thomson_35_fd_format::formats[] = {
 		1, {},
 		31, 22, 44
 	},
+	{	// DS, DD on side 0, SD on side 1
+		floppy_image::FF_35, floppy_image::DSDD, floppy_image::MFM,
+		2000,
+		16, 80, 2,
+		256, {},
+		1, {},
+		31, 22, 44
+	},
 	{
 		floppy_image::FF_35, floppy_image::SSDD, floppy_image::MFM,
 		2000,
@@ -234,6 +337,22 @@ const thomson_35_fd_format::format thomson_35_fd_format::formats[] = {
 		256, {},
 		1, {},
 		31, 22, 44
+	},
+	{	// DS, SD on side 0, DD on side 1
+		floppy_image::FF_35, floppy_image::DSSD, floppy_image::FM,
+		4000,
+		16, 80, 2,
+		128, {},
+		1, {},
+		17, 12, 22
+	},
+	{
+		floppy_image::FF_35, floppy_image::DSSD, floppy_image::FM,
+		4000,
+		16, 80, 2,
+		128, {},
+		1, {},
+		17, 12, 22
 	},
 	{
 		floppy_image::FF_35, floppy_image::SSSD, floppy_image::FM,
@@ -245,33 +364,6 @@ const thomson_35_fd_format::format thomson_35_fd_format::formats[] = {
 	},
 	{}
 };
-
-int thomson_35_fd_format::get_image_offset(const format &f, int head, int track) const
-{
-	return (track + (head ? f.track_count : 0)) * compute_track_size(f);
-}
-
-floppy_image_format_t::desc_e* thomson_35_fd_format::get_desc_fm(const format &f, int &current_size, int &end_gap_index) const
-{
-	floppy_image_format_t::desc_e *desc = wd177x_format::get_desc_fm(f, current_size, end_gap_index);
-
-	// The format description differs from the wd177x format:
-	// the head id is always zero (in field 6)
-	desc[6] = { FM, 0x00, 1 };
-
-	return desc;
-}
-
-floppy_image_format_t::desc_e* thomson_35_fd_format::get_desc_mfm(const format &f, int &current_size, int &end_gap_index) const
-{
-	floppy_image_format_t::desc_e *desc = wd177x_format::get_desc_mfm(f, current_size, end_gap_index);
-
-	// The format description differs from the wd177x format:
-	// the head id is always zero (in field 7)
-	desc[7] = { MFM, 0x00, 1 };
-
-	return desc;
-}
 
 #define SAP_SIGNATURE   "SYSTEME D'ARCHIVAGE PUKALL S.A.P. " \
 			"(c) Alexandre PUKALL Avril 1998"
@@ -349,7 +441,7 @@ static uint16_t compute_sap_crc(uint8_t* data, int size)
 {
 	int i;
 	uint16_t crc = 0xffff, crc2;
-	for (i = 0; i < size; i++)
+	for(i = 0; i < size; i++)
 	{
 		crc2 = (crc >> 4) ^ sap_crc[(crc ^ data[i]) & 15];
 		crc = (crc2 >> 4) ^ sap_crc[(crc2 ^ (data[i] >> 4)) & 15];
@@ -410,7 +502,7 @@ bool thomson_sap_format::load(util::random_read &io, uint32_t form_factor, const
 
 		build_sector_description(tf, sectdata, sectors, track, 0);
 
-		for (int i = 0; i < f.sector_count; i++) {
+		for(int i = 0; i < f.sector_count; i++) {
 			uint8_t buffer[262];
 			read_at(io, file_offset, buffer, f.sector_base_size + 6);
 			// consistency checks
@@ -437,7 +529,7 @@ bool thomson_sap_format::load(util::random_read &io, uint32_t form_factor, const
 				return false;
 			}
 			// decrypt
-			for (int j = 0; j < f.sector_base_size; j++)
+			for(int j = 0; j < f.sector_base_size; j++)
 				buffer[4 + j] ^= sap_magic_num;
 			// check CRC
 			uint16_t crc = compute_sap_crc (buffer, f.sector_base_size + 4);
@@ -496,7 +588,7 @@ bool thomson_sap_format::save(util::random_read_write &io, const std::vector<uin
 		build_sector_description(tf, sectdata, sectors, track, 0);
 		extract_sectors(image, tf, sectors, track, 0);
 
-		for (int i = 0; i < f.sector_count; i++) {
+		for(int i = 0; i < f.sector_count; i++) {
 			uint8_t buffer[262];
 			buffer[0] = 0;
 			buffer[1] = 0;
@@ -508,7 +600,7 @@ bool thomson_sap_format::save(util::random_read_write &io, const std::vector<uin
 			buffer[f.sector_base_size + 4] = crc >> 8;
 			buffer[f.sector_base_size + 5] = crc & 0xff;
 			// encrypt
-			for (int j = 0; j < f.sector_base_size; j++)
+			for(int j = 0; j < f.sector_base_size; j++)
 				buffer[4 + j] ^= sap_magic_num;
 			write_at(io, file_offset, buffer, f.sector_base_size + 6);
 			file_offset += f.sector_base_size + 6;
