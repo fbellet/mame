@@ -325,6 +325,13 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 		f->heads = 2;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 
+		// floppy_image::FF_35, floppy_image::DSSD
+		f->tracks = 80;
+		f->sector_size = 128;
+		f->sectuse_size = 128;
+		f->heads = 2;
+		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+
 		// floppy_image::FF_35, floppy_image::SSDD
 		f->tracks = 80;
 		f->sector_size = 256;
@@ -1264,12 +1271,7 @@ static imgtoolerr_t thom_create(imgtool::image &img,
 
 	switch ( f->heads ) {
 	case 1: break;
-	case 2:
-		if ( f->sector_size == 128 ) {
-			util::stream_format(std::wcerr, L"thom_create: 2 heads incompatible with single density (SSSD/SSDD/DSDD)\n");
-			return IMGTOOLERR_PARAMCORRUPT;
-		}
-		break;
+	case 2: break;
 	default: return IMGTOOLERR_PARAMCORRUPT;
 	}
 
