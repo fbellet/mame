@@ -128,13 +128,13 @@
 struct thom_floppy {
 	imgtool::stream *stream;
 
-	uint16_t sector_size;   /* 128 or 256 */
-	uint16_t sectuse_size;  /* bytes used in sector: 128 or 255 */
-	uint8_t  tracks;        /* 25, 40, or 80 */
-	uint8_t  heads;         /* 1 or 2 */
-	uint8_t  data[MAXSIZE]; /* image data */
+	uint16_t sector_size[2];   /* 128 or 256 */
+	uint16_t sectuse_size[2];  /* bytes used in sector: 128 or 255 */
+	uint8_t  tracks;           /* 25, 40, or 80 */
+	uint8_t  heads;            /* 1 or 2 */
+	uint8_t  data[MAXSIZE];    /* image data */
 
-	int    modified;      /* data need to be copied back to image file */
+	int    modified;           /* data need to be copied back to image file */
 
 };
 
@@ -172,6 +172,7 @@ static void thom_basic_get_info(const imgtool_class *clas, uint32_t param,
 static uint8_t* thom_get_sector(thom_floppy* f, unsigned head,
 					unsigned track, unsigned sector);
 
+static int thom_nb_blocks(thom_floppy* f, unsigned head);
 
 static thom_floppy *get_thom_floppy(imgtool::image &image)
 {
@@ -192,8 +193,8 @@ static thom_floppy *get_thom_floppy(imgtool::image &image)
 // in thom_dsk.cpp. See comments there.
 static bool validate_fat(thom_floppy *f)
 {
-	int nblocks = (f->tracks * 2 < f->sector_size - 1 ? f->tracks * 2 : f->sector_size - 1);
 	for (int head = 0; head < f->heads ; head++) {
+		int nblocks = thom_nb_blocks(f, head);
 		uint8_t* fat = thom_get_sector( f, head, 20, 2 );
 		if (fat[0])
 			return false;
@@ -215,12 +216,12 @@ static bool validate_fat(thom_floppy *f)
 // in thom_dsk.cpp. See comments there.
 static bool validate_catalog(thom_floppy *f)
 {
-	int nblocks = (f->tracks * 2 < f->sector_size - 1 ? f->tracks * 2 : f->sector_size - 1);
 	for (int head = 0; head < f->heads ; head++) {
+		int nblocks = thom_nb_blocks(f, head);
 		bool end_of_catalog = false;
 		for (int sect = 3; sect <= 16; sect++) {
 			uint8_t* cat = thom_get_sector( f, head, 20, sect );
-			for (int i = 0; i < f->sector_size; i += 32) {
+			for (int i = 0; i < f->sector_size[head]; i += 32) {
 				bool end_of_filename = false;
 				bool end_of_suffix = false;
 				if (end_of_catalog) {
@@ -264,7 +265,7 @@ static imgtoolerr_t validate_format(imgtool::image &img, int size)
 {
 	thom_floppy* f = get_thom_floppy(img);
 
-	assert( size == f->heads * f->tracks * 16 * f->sector_size );
+	assert( size == f->tracks * 16 * (f->sector_size[0] + f->sector_size[1]) );
 
 	f->stream->seek(0, SEEK_SET);
 	if (f->stream->read(f->data, size ) < size)
@@ -286,8 +287,10 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 	case 81920:
 		// floppy_image::FF_525, floppy_image::SSSD
 		f->tracks = 40;
-		f->sector_size = 128;
-		f->sectuse_size = 128;
+		f->sector_size[0] = 128;
+		f->sectuse_size[0] = 128;
+		f->sector_size[1] = 0;
+		f->sectuse_size[1] = 0;
 		f->heads = 1;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
@@ -296,23 +299,50 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 	case 163840:
 		// floppy_image::FF_525, floppy_image::DSSD
 		f->tracks = 40;
-		f->sector_size = 128;
-		f->sectuse_size = 128;
+		f->sector_size[0] = 128;
+		f->sectuse_size[0] = 128;
+		f->sector_size[1] = 128;
+		f->sectuse_size[1] = 128;
 		f->heads = 2;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 
 		// floppy_image::FF_525, floppy_image::SSDD
 		f->tracks = 40;
-		f->sector_size = 256;
-		f->sectuse_size = 255;
+		f->sector_size[0] = 256;
+		f->sectuse_size[0] = 255;
+		f->sector_size[1] = 0;
+		f->sectuse_size[1] = 0;
 		f->heads = 1;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 
 		// floppy_image::FF_35, floppy_image::SSSD
 		f->tracks = 80;
-		f->sector_size = 128;
-		f->sectuse_size = 128;
+		f->sector_size[0] = 128;
+		f->sectuse_size[0] = 128;
+		f->sector_size[1] = 0;
+		f->sectuse_size[1] = 0;
 		f->heads = 1;
+		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
+		return IMGTOOLERR_CORRUPTIMAGE;
+
+	case 245760:
+		// floppy_image::FF_525, floppy_image::DS, side 0 SD, side 1 DD
+		f->tracks = 40;
+		f->sector_size[0] = 128;
+		f->sectuse_size[0] = 128;
+		f->sector_size[1] = 256;
+		f->sectuse_size[1] = 255;
+		f->heads = 2;
+		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+
+		// floppy_image::FF_525, floppy_image::DS, side 0 DD, side 1 SD
+		f->tracks = 40;
+		f->sector_size[0] = 256;
+		f->sectuse_size[0] = 255;
+		f->sector_size[1] = 128;
+		f->sectuse_size[1] = 128;
+		f->heads = 2;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
 		return IMGTOOLERR_CORRUPTIMAGE;
@@ -320,32 +350,62 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 	case 327680:
 		// floppy_image::FF_525, floppy_image::DSDD
 		f->tracks = 40;
-		f->sector_size = 256;
-		f->sectuse_size = 255;
+		f->sector_size[0] = 256;
+		f->sectuse_size[0] = 255;
+		f->sector_size[1] = 256;
+		f->sectuse_size[1] = 255;
 		f->heads = 2;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 
 		// floppy_image::FF_35, floppy_image::DSSD
 		f->tracks = 80;
-		f->sector_size = 128;
-		f->sectuse_size = 128;
+		f->sector_size[0] = 128;
+		f->sectuse_size[0] = 128;
+		f->sector_size[1] = 128;
+		f->sectuse_size[1] = 128;
 		f->heads = 2;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 
 		// floppy_image::FF_35, floppy_image::SSDD
 		f->tracks = 80;
-		f->sector_size = 256;
-		f->sectuse_size = 255;
+		f->sector_size[0] = 256;
+		f->sectuse_size[0] = 255;
+		f->sector_size[1] = 0;
+		f->sectuse_size[1] = 0;
 		f->heads = 1;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
+		return IMGTOOLERR_CORRUPTIMAGE;
+
+	case 491520:
+		// floppy_image::FF_35, floppy_image::DS, side 0 SD, side 1 DD
+		f->tracks = 80;
+		f->sector_size[0] = 128;
+		f->sectuse_size[0] = 128;
+		f->sector_size[1] = 256;
+		f->sectuse_size[1] = 255;
+		f->heads = 2;
+		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+
+		// floppy_image::FF_35, floppy_image::DS, side 0 DD, side 1 SD
+		f->tracks = 80;
+		f->sector_size[0] = 256;
+		f->sectuse_size[0] = 255;
+		f->sector_size[1] = 128;
+		f->sectuse_size[1] = 128;
+		f->heads = 2;
+		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
+
 		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	case 655360:
 		// floppy_image::FF_35, floppy_image::DSDD
 		f->tracks = 80;
-		f->sector_size = 256;
-		f->sectuse_size = 255;
+		f->sector_size[0] = 256;
+		f->sectuse_size[0] = 255;
+		f->sector_size[1] = 256;
+		f->sectuse_size[1] = 255;
 		f->heads = 2;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
@@ -353,18 +413,11 @@ static imgtoolerr_t thom_open_fd_qd(imgtool::image &img, imgtool::stream::ptr &&
 
 	case 51200:
 		f->tracks = 25;
-		f->sector_size = 128;
-		f->sectuse_size = 128;
+		f->sector_size[0] = 128;
+		f->sectuse_size[0] = 128;
+		f->sector_size[1] = 0;
+		f->sectuse_size[1] = 0;
 		f->heads = 1;
-		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
-		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
-		return IMGTOOLERR_CORRUPTIMAGE;
-
-	case 62400:
-		f->tracks = 25;
-		f->sector_size = 128;
-		f->sectuse_size = 128;
-		f->heads = 2;
 		if (validate_format (img, size) == IMGTOOLERR_SUCCESS) break;
 		util::stream_format(std::wcerr, L"thom_open_fd_qd: could not validate image file\n");
 		return IMGTOOLERR_CORRUPTIMAGE;
@@ -383,7 +436,9 @@ static void thom_close_fd_qd(imgtool::image &img)
 
 	/* save image */
 	if ( f->modified ) {
-	int size = f->heads * f->tracks * 16 * f->sector_size;
+	int size = f->tracks * 16 * (f->sector_size[0] + f->sector_size[1]);
+
+
 	f->stream->seek(0, SEEK_SET);
 	if (f->stream->write(f->data, size) < size)
 	{
@@ -450,6 +505,8 @@ static imgtoolerr_t thom_open_sap(imgtool::image &img, imgtool::stream::ptr &&st
 
 	f->stream = stream.get();
 	f->modified = 0;
+	f->sector_size[1] = 0;
+	f->sectuse_size[1] = 0;
 
 	// check image header
 	f->stream->seek(0, SEEK_SET);
@@ -462,14 +519,14 @@ static imgtoolerr_t thom_open_sap(imgtool::image &img, imgtool::stream::ptr &&st
 	case 1:
 		f->heads = 1;
 		f->tracks = 80;
-		f->sector_size = 256;
-		f->sectuse_size = 255;
+		f->sector_size[0] = 256;
+		f->sectuse_size[0] = 255;
 		break;
 	case 2:
 		f->heads = 1;
 		f->tracks = 40;
-		f->sector_size = 128;
-		f->sectuse_size = 128;
+		f->sector_size[0] = 128;
+		f->sectuse_size[0] = 128;
 		break;
 	default:
 		return IMGTOOLERR_CORRUPTIMAGE;
@@ -481,7 +538,7 @@ static imgtoolerr_t thom_open_sap(imgtool::image &img, imgtool::stream::ptr &&st
 	uint16_t crc;
 
 	/* load sector */
-	if (f->stream->read(buf, 6 + f->sector_size ) < 6 + f->sector_size )
+	if (f->stream->read(buf, 6 + f->sector_size[0] ) < 6 + f->sector_size[0] )
 		break;
 
 	/* parse sector header */
@@ -491,13 +548,13 @@ static imgtoolerr_t thom_open_sap(imgtool::image &img, imgtool::stream::ptr &&st
 		return IMGTOOLERR_CORRUPTIMAGE;
 
 	/* decrypt */
-	for ( i = 0; i < f->sector_size; i++ ) buf[ i + 4 ] ^= sap_magic_num;
-	memcpy( thom_get_sector( f, 0, track, sector ), buf + 4, f->sector_size );
+	for ( i = 0; i < f->sector_size[0]; i++ ) buf[ i + 4 ] ^= sap_magic_num;
+	memcpy( thom_get_sector( f, 0, track, sector ), buf + 4, f->sector_size[0] );
 
 	/* check CRC */
-	crc = thom_sap_crc( buf, f->sector_size + 4 );
-	if ( ( (crc >> 8)   != buf[ f->sector_size + 4 ] ) ||
-			( (crc & 0xff) != buf[ f->sector_size + 5 ] ) )
+	crc = thom_sap_crc( buf, f->sector_size[0] + 4 );
+	if ( ( (crc >> 8)   != buf[ f->sector_size[0] + 4 ] ) ||
+			( (crc & 0xff) != buf[ f->sector_size[0] + 5 ] ) )
 		return IMGTOOLERR_CORRUPTIMAGE;
 	}
 
@@ -532,19 +589,19 @@ static void thom_close_sap(imgtool::image &img)
 	buf[2] = track;
 	buf[3] = sector;
 	memcpy( buf + 4,
-		thom_get_sector( f, 0, track, sector), f->sector_size );
+		thom_get_sector( f, 0, track, sector), f->sector_size[0] );
 
 	/* compute crc */
-	crc = thom_sap_crc( buf, f->sector_size + 4 );
-	buf[ f->sector_size + 4 ] = crc >> 8;
-	buf[ f->sector_size + 5 ] = crc & 0xff;
+	crc = thom_sap_crc( buf, f->sector_size[0] + 4 );
+	buf[ f->sector_size[0] + 4 ] = crc >> 8;
+	buf[ f->sector_size[0] + 5 ] = crc & 0xff;
 
 	/* crypt */
-	for ( i = 0; i < f->sector_size; i++ ) buf[ i + 4 ] ^= sap_magic_num;
+	for ( i = 0; i < f->sector_size[0]; i++ ) buf[ i + 4 ] ^= sap_magic_num;
 
 	/* save */
-	if (f->stream->write(buf, f->sector_size + 6) <
-			f->sector_size + 6) {
+	if (f->stream->write(buf, f->sector_size[0] + 6) <
+			f->sector_size[0] + 6) {
 		/* logerror( "thom_diskimage_close_sap: write error\n" ); */
 		return;
 	}
@@ -563,20 +620,23 @@ static uint8_t* thom_get_sector(thom_floppy* f, unsigned head,
 	assert( head < f->heads);
 	assert( track < f->tracks );
 	assert( sector > 0 && sector <= 16 );
-	return & f->data[ ( (head * f->tracks + track) * 16 + (sector-1) ) *
-			f->sector_size ];
+	int offset[2] = { 0, 0 };
+	for (int h = 0; h < head; h++)
+		offset[h] = (f->sector_size[h] * 16 * f->tracks);
+	offset[head] = (track * 16 + (sector -1)) * f->sector_size[head];
+	return & f->data[ offset[0] + offset[1]];
 }
 
-static int thom_nb_blocks(thom_floppy* f)
+static int thom_nb_blocks(thom_floppy* f, unsigned head)
 {
-	int n1 = f->tracks * 2;      /* 2 blocks per track */
-	int n2 = f->sector_size - 1; /* FAT entries */
+	int n1 = f->tracks * 2;            /* 2 blocks per track */
+	int n2 = f->sector_size[head] - 1; /* FAT entries */
 	return (n1 < n2) ? n1 : n2;
 }
 
-static int thom_max_dirent(thom_floppy* f)
+static int thom_max_dirent(thom_floppy* f, unsigned head)
 {
-	return 14 * f->sector_size / 32;
+	return 14 * f->sector_size[head] / 32;
 }
 
 /* remove trailing spaces */
@@ -653,7 +713,7 @@ static void thom_get_dirent(thom_floppy* f, unsigned head,
 	uint8_t* base = thom_get_sector( f, head, 20, 3 ) + n * 32;
 	memset( d, 0, sizeof(*d) );
 	d->index = n;
-	if ( n >= thom_max_dirent( f ) )
+	if ( n >= thom_max_dirent( f, head ) )
 	d->type = THOM_DIRENT_END;
 	else if ( *base == 0xff )
 	d->type = THOM_DIRENT_END;
@@ -686,7 +746,7 @@ static void thom_set_dirent(thom_floppy* f, unsigned head,
 				unsigned n, thom_dirent* d)
 {
 	uint8_t* base = thom_get_sector( f, head, 20, 3 ) + n * 32;
-	if ( n >= thom_max_dirent( f ) ) return;
+	if ( n >= thom_max_dirent( f, head ) ) return;
 	memset( base, 0, 32 );
 	if ( d->type == THOM_DIRENT_END ) base[ 0 ] = 0xff;
 	else if ( d->type == THOM_DIRENT_FREE ) base[ 0 ] = 0;
@@ -736,7 +796,7 @@ static int thom_find_free_dirent(thom_floppy* f, unsigned head, thom_dirent* d)
 	if ( d->type == THOM_DIRENT_END ) break;
 	n++;
 	}
-	if ( n + 1 >= thom_max_dirent( f ) ) return 0;
+	if ( n + 1 >= thom_max_dirent( f, head ) ) return 0;
 	thom_set_dirent( f, head, n+1, d );
 	d->type = THOM_DIRENT_FREE;
 	return 1;
@@ -746,7 +806,7 @@ static int thom_find_free_dirent(thom_floppy* f, unsigned head, thom_dirent* d)
 static int thom_get_file_size(thom_floppy* f, unsigned head, thom_dirent* d)
 {
 	uint8_t* fat = thom_get_sector( f, head, 20, 2 );
-	int nbblocks = thom_nb_blocks(f);
+	int nbblocks = thom_nb_blocks(f, head);
 	int block = d->firstblock;
 	int size = 0;
 	int timeout = nbblocks;
@@ -756,12 +816,12 @@ static int thom_get_file_size(thom_floppy* f, unsigned head, thom_dirent* d)
 	while ( 1 ) {
 	if ( block < nbblocks ) {
 		/* full block */
-		size += 8 * f->sectuse_size;
+		size += 8 * f->sectuse_size[head];
 		block = fat[ block + 1 ];
 	}
 	else if ( block >= 0xc1 && block <= 0xc8 ) {
 		/* last block in file */
-		size += (block-0xc1) * f->sectuse_size;
+		size += (block-0xc1) * f->sectuse_size[head];
 		size += d->lastsectsize;
 		return size;
 	}
@@ -775,7 +835,7 @@ static int thom_get_file_size(thom_floppy* f, unsigned head, thom_dirent* d)
 static int thom_get_file_blocks(thom_floppy* f, unsigned head, thom_dirent* d)
 {
 	uint8_t* fat = thom_get_sector( f, head, 20, 2 );
-	int nbblocks = thom_nb_blocks(f);
+	int nbblocks = thom_nb_blocks(f, head);
 	int block = d->firstblock;
 	int nb = 0;
 	if ( d->type != THOM_DIRENT_FILE ) return 0;
@@ -800,7 +860,7 @@ static int thom_get_file_blocks(thom_floppy* f, unsigned head, thom_dirent* d)
 static int thom_get_free_blocks(thom_floppy* f, unsigned head)
 {
 	uint8_t* fat = thom_get_sector( f, head, 20, 2 );
-	int nbblocks = thom_nb_blocks(f);
+	int nbblocks = thom_nb_blocks(f, head);
 	int i, nb = 0;
 	for ( i = 1; i <= nbblocks; i++ )
 	if ( fat[i] == 0xff ) nb++;
@@ -812,7 +872,7 @@ static void thom_get_file(thom_floppy* f, unsigned head,
 				thom_dirent* d, imgtool::stream &dst)
 {
 	uint8_t* fat = thom_get_sector( f, head, 20, 2 );
-	int nbblocks = thom_nb_blocks(f);
+	int nbblocks = thom_nb_blocks(f, head);
 	int block = d->firstblock;
 	if ( block >= nbblocks ) return;
 	while ( 1 )
@@ -827,7 +887,7 @@ static void thom_get_file(thom_floppy* f, unsigned head,
 			for ( i = 0; i < 8; i++ )
 			{
 				uint8_t* data = thom_get_sector( f, head, track, firstsect + i );
-				dst.write(data, f->sectuse_size);
+				dst.write(data, f->sectuse_size[head]);
 			}
 			block = fat[ block + 1 ];
 		}
@@ -839,7 +899,7 @@ static void thom_get_file(thom_floppy* f, unsigned head,
 			for ( i = 0; i < nextblock - 0xc1; i++ )
 			{
 				data = thom_get_sector( f, head, track, firstsect + i );
-				dst.write(data, f->sectuse_size);
+				dst.write(data, f->sectuse_size[head]);
 			}
 			data = thom_get_sector( f, head, track, firstsect + i );
 			dst.write(data, d->lastsectsize);
@@ -859,7 +919,7 @@ static void thom_get_file(thom_floppy* f, unsigned head,
 static void thom_del_file(thom_floppy* f, unsigned head, thom_dirent* d)
 {
 	uint8_t* fat = thom_get_sector( f, head, 20, 2 );
-	int nbblocks = thom_nb_blocks(f);
+	int nbblocks = thom_nb_blocks(f, head);
 	int block = d->firstblock;
 	if ( d->type != THOM_DIRENT_FILE ) return;
 	if ( block >= nbblocks ) return;
@@ -880,7 +940,7 @@ static void thom_put_file(thom_floppy* f, unsigned head,
 {
 	int size = src.size();
 	uint8_t* fat = thom_get_sector( f, head, 20, 2 );
-	int nbblocks = thom_nb_blocks(f);
+	int nbblocks = thom_nb_blocks(f, head);
 	int block;
 
 	/* find first free block */
@@ -895,10 +955,10 @@ static void thom_put_file(thom_floppy* f, unsigned head,
 	int i;
 
 	/* store data, full sectors */
-	for ( i = 0; i < 8 && size > f->sectuse_size; i++ ) {
+	for ( i = 0; i < 8 && size > f->sectuse_size[head]; i++ ) {
 		uint8_t* dst = thom_get_sector( f, head, track, firstsect + i );
-		src.read(dst, f->sectuse_size);
-		size -= f->sectuse_size;
+		src.read(dst, f->sectuse_size[head]);
+		size -= f->sectuse_size[head];
 	}
 
 	/* store data, last sector */
@@ -948,10 +1008,10 @@ static imgtoolerr_t thom_read_sector(imgtool::image &img, uint32_t track,
 		return IMGTOOLERR_SEEKERROR;
 
 	// resize the buffer
-	try { buffer.resize(f->sector_size); }
+	try { buffer.resize(f->sector_size[head]); }
 	catch (std::bad_alloc const &) { return IMGTOOLERR_OUTOFMEMORY; }
 
-	memcpy( &buffer[0], thom_get_sector( f, head, track, sector ), f->sector_size);
+	memcpy( &buffer[0], thom_get_sector( f, head, track, sector ), f->sector_size[head]);
 	return IMGTOOLERR_SUCCESS;
 }
 
@@ -963,7 +1023,7 @@ static imgtoolerr_t thom_write_sector(imgtool::image &img, uint32_t track,
 	if ( f->stream->is_read_only() ) return IMGTOOLERR_WRITEERROR;
 	if ( head >= f->heads || sector < 1 || sector > 16 || track >= f->tracks )
 	return IMGTOOLERR_SEEKERROR;
-	if ( len > f->sector_size) return IMGTOOLERR_WRITEERROR;
+	if ( len > f->sector_size[head]) return IMGTOOLERR_WRITEERROR;
 	f->modified = 1;
 	memcpy( thom_get_sector( f, head, track, sector ), buf, len );
 	return IMGTOOLERR_SUCCESS;
@@ -1059,7 +1119,7 @@ static imgtoolerr_t thom_free_space(imgtool::partition &part, uint64_t *size)
 	imgtool::image &img(part.image());
 	thom_floppy* f = get_thom_floppy(img);
 	int nb = thom_get_free_blocks( f, head );
-	(*size) = nb * f->sectuse_size * 8;
+	(*size) = nb * f->sectuse_size[head] * 8;
 	return IMGTOOLERR_SUCCESS;
 }
 
@@ -1134,13 +1194,13 @@ static imgtoolerr_t thom_write_file(imgtool::partition &part,
 	/* file already exists: delete it */
 	if ( thom_get_file_size( f, head, &d ) < 0 ) return IMGTOOLERR_CORRUPTFILE;
 	blocks += thom_get_file_blocks( f, head, &d );
-	if ( blocks * 8 * f->sectuse_size < size ) return IMGTOOLERR_NOSPACE;
+	if ( blocks * 8 * f->sectuse_size[head] < size ) return IMGTOOLERR_NOSPACE;
 	thom_del_file( f, head, &d );
 	is_new = 0;
 	}
 	else {
 	/* new file, need new dir entry */
-	if ( blocks * 8 * f->sectuse_size < size ) return IMGTOOLERR_NOSPACE;
+	if ( blocks * 8 * f->sectuse_size[head] < size ) return IMGTOOLERR_NOSPACE;
 	if ( ! thom_find_free_dirent( f, head, &d ) ) return IMGTOOLERR_NOSPACE;
 	thom_make_time_now( &d );
 	}
@@ -1247,23 +1307,51 @@ static imgtoolerr_t thom_create(imgtool::image &img,
 
 	f->stream = stream.get();
 	f->modified = 0;
+	f->sector_size[1] = 0;
+	f->sectuse_size[1] = 0;
 
 	/* get parameters */
 	f->heads = opts->lookup_int('H');
 	f->tracks = opts->lookup_int('T');
 	name = opts->lookup_string('N').c_str();
 	switch ( opts->lookup_int('D') ) {
-	case 0: f->sector_size = 128; f->sectuse_size = 128; break;
-	case 1: f->sector_size = 256; f->sectuse_size = 255; break;
+	case 0:
+		f->sector_size[0] = 128;
+		f->sectuse_size[0] = 128;
+		if (f->heads > 1) {
+			f->sector_size[1] = 128;
+			f->sectuse_size[1] = 128;
+		}
+		break;
+	case 1:
+		f->sector_size[0] = 256;
+		f->sectuse_size[0] = 255;
+		if (f->heads > 1) {
+			f->sector_size[1] = 256;
+			f->sectuse_size[1] = 255;
+		}
+		break;
 	default: return IMGTOOLERR_PARAMCORRUPT;
 	}
 #ifdef IMGTOOL_DEBUG
-	util::stream_format(std::wcout, L"thom_create: sector_size=%d for selected density\n", f->sector_size);
+	util::stream_format(std::wcout, L"thom_create: sector_size=%d for selected density\n", f->sector_size[0]);
 #endif
 
 	/* sanity checks */
 	switch ( f->tracks ) {
-	case 25: if ( f->sector_size != 128 ) return IMGTOOLERR_PARAMCORRUPT; break;
+	case 25:
+		if ( f->sector_size[0] != 128 ) {
+#ifdef IMGTOOL_DEBUG
+			util::stream_format(std::wcout, L"thom_create: QDD is single density\n");
+#endif
+			return IMGTOOLERR_PARAMCORRUPT; break;
+		}
+		if ( f->heads > 1 ) {
+#ifdef IMGTOOL_DEBUG
+			util::stream_format(std::wcout, L"thom_create: QDD is single sided\n");
+#endif
+			return IMGTOOLERR_PARAMCORRUPT; break;
+		}
 	case 40: break;
 	case 80: break;
 	default: return IMGTOOLERR_PARAMCORRUPT;
@@ -1280,7 +1368,7 @@ static imgtoolerr_t thom_create(imgtool::image &img,
 	for ( i = 0; i < f->heads; i++ ) {
 	/* disk info */
 	buf = thom_get_sector( f, i, 20, 1 );
-	memset( buf, 0xff, f->sector_size );
+	memset( buf, 0xff, f->sector_size[i] );
 	if ( name ) {
 		strncpy( (char*)buf, name, 8 );
 		thom_unstringity( (char*)buf, 8 );
@@ -1289,13 +1377,13 @@ static imgtoolerr_t thom_create(imgtool::image &img,
 
 	/* FAT */
 	buf = thom_get_sector( f, i, 20, 2 );
-	memset( buf, 0, f->sector_size );
-	memset( buf + 1, 0xff, thom_nb_blocks( f ) );
+	memset( buf, 0, f->sector_size[i] );
+	memset( buf + 1, 0xff, thom_nb_blocks( f, i ) );
 	buf[ 41 ] = buf[ 42 ] = 0xfe; /* reserved for FAT */
 
 	/* (empty) directory */
 	buf = thom_get_sector( f, i, 20, 3 );
-	memset( buf, 0xff, 14 * f->sector_size );
+	memset( buf, 0xff, 14 * f->sector_size[i] );
 	}
 
 	f->modified = 1;
@@ -1312,20 +1400,22 @@ static imgtoolerr_t thom_sap_create(imgtool::image &img,
 
 	/* get parameters */
 	f->tracks = opts->lookup_int('T');
+	f->sector_size[1] = 0;
+	f->sectuse_size[1] = 0;
 	switch ( opts->lookup_int('D') ) {
-	case 0: f->sector_size = 128; f->sectuse_size = 128; break;
-	case 1: f->sector_size = 256; f->sectuse_size = 255; break;
+	case 0: f->sector_size[0] = 128; f->sectuse_size[0] = 128; break;
+	case 1: f->sector_size[0] = 256; f->sectuse_size[0] = 255; break;
 	}
 
 	/* sanity checks */
 	switch ( f->tracks ) {
 	case 40:
-		if ( f->sector_size != 128 ) {
+		if ( f->sector_size[0] != 128 ) {
 			util::stream_format(std::wcerr, L"thom_sap_create: SAP format cannot have 40 tracks in double density\n");
 			return IMGTOOLERR_PARAMCORRUPT;
 		}
 		break;
-	case 80: if ( f->sector_size != 256 ) {
+	case 80: if ( f->sector_size[0] != 256 ) {
 			util::stream_format(std::wcerr, L"thom_sap_create: SAP format cannot have 80 tracks in single density\n");
 			return IMGTOOLERR_PARAMCORRUPT;
 		}
