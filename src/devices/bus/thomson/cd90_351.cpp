@@ -54,7 +54,7 @@ const tiny_rom_entry *cd90_351_device::device_rom_region() const
 
 void cd90_351_device::thmfc1_drives(device_slot_interface &device)
 {
-	device.option_add("dd90_352", FLOPPY_35_DD);
+	device.option_add("dd90_352", THOMSON_35_DD);
 	device.option_add("qd90_280", THOMSON_QDD);
 }
 

@@ -1161,12 +1161,12 @@ static void wd2793_formats(format_registration &fr)
 
 static void wd2793_internal_drives(device_slot_interface &device)
 {
-	device.option_add("35dd", FLOPPY_35_DD);
+	device.option_add("35dd", THOMSON_35_DD);
 }
 
 static void wd2793_external_drives(device_slot_interface &device)
 {
-	device.option_add("dd90_352", FLOPPY_35_DD);
+	device.option_add("dd90_352", THOMSON_35_DD);
 }
 
 void to9_state::to9(machine_config &config)
@@ -1356,12 +1356,12 @@ static void thmfc1_formats(format_registration &fr)
 
 static void thmfc1_internal_drives(device_slot_interface &device)
 {
-	device.option_add("35dd", FLOPPY_35_DD);
+	device.option_add("35dd", THOMSON_35_DD);
 }
 
 static void thmfc1_external_drives(device_slot_interface &device)
 {
-	device.option_add("dd90_352", FLOPPY_35_DD);
+	device.option_add("dd90_352", THOMSON_35_DD);
 	device.option_add("qd90_280", THOMSON_QDD);
 }
 

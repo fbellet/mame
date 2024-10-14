@@ -146,6 +146,9 @@ DEFINE_DEVICE_TYPE(ALPS_3255190X, alps_3255190x, "alps_3255190x", "ALPS 32551901
 // IBM 8" drives
 DEFINE_DEVICE_TYPE(IBM_6360, ibm_6360, "ibm_6360", "IBM 6360 8\" single-sided single density floppy drive")
 
+// Thomson 3.5" drives
+DEFINE_DEVICE_TYPE(THOMSON_35_DD, thomson_35_dd, "thomson_35_dd", "Thomson 3.5\" double density floppy drive")
+
 // Mac 3.5" drives
 DEFINE_DEVICE_TYPE(OAD34V, oa_d34v_device, "oa_d34v", "Apple/Sony 3.5 SD (400K GCR)")
 DEFINE_DEVICE_TYPE(MFD51W, mfd51w_device,  "mfd51w",  "Apple/Sony 3.5 DD (400/800K GCR)")
@@ -1887,7 +1890,6 @@ void floppy_35_dd::setup_characteristics()
 
 	add_variant(floppy_image::SSSD);
 	add_variant(floppy_image::SSDD);
-	add_variant(floppy_image::DSSD);
 	add_variant(floppy_image::DSDD);
 }
 
@@ -2771,6 +2773,35 @@ void ibm_6360::setup_characteristics()
 	set_rpm(360);
 
 	add_variant(floppy_image::SSSD);
+}
+
+//-------------------------------------------------
+//  THOMSON 3.5" -- 3.5" double-sided double density
+//  these drives have a separate FAT on each side, that
+//  can be used indenpendently, so more floppy image
+//  variants are possible
+//-------------------------------------------------
+
+thomson_35_dd::thomson_35_dd(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
+	floppy_image_device(mconfig, THOMSON_35_DD, tag, owner, clock)
+{
+}
+
+thomson_35_dd::~thomson_35_dd()
+{
+}
+
+void thomson_35_dd::setup_characteristics()
+{
+	m_form_factor = floppy_image::FF_35;
+	m_tracks = 84;
+	m_sides = 2;
+	set_rpm(300);
+
+	add_variant(floppy_image::SSSD);
+	add_variant(floppy_image::SSDD);
+	add_variant(floppy_image::DSSD);
+	add_variant(floppy_image::DSDD);
 }
 
 
