@@ -927,8 +927,8 @@ static void thom_del_file(thom_floppy* f, unsigned head, thom_dirent* d)
 	if ( block >= nbblocks ) return;
 	while ( 1 ) {
 	int nextblock = fat[ block + 1 ];
-	fat[ block ] = 0xff;
-	if ( nextblock < nbblocks ) block = fat[ block + 1 ];
+	fat[ block + 1 ] = 0xff;
+	if ( nextblock < nbblocks ) block = nextblock;
 	else break;
 	}
 	d->type = THOM_DIRENT_FREE;
