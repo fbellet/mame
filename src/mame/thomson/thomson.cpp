@@ -1161,7 +1161,7 @@ static void wd2793_formats(format_registration &fr)
 
 static void wd2793_internal_drives(device_slot_interface &device)
 {
-	device.option_add("35ssdd", FLOPPY_35_SSDD);
+	device.option_add("35dd", FLOPPY_35_DD);
 }
 
 static void wd2793_external_drives(device_slot_interface &device)
@@ -1190,7 +1190,7 @@ void to9_state::to9(machine_config &config)
 	m_mc6846->out_port().set(FUNC(to9_state::to9_timer_port_out));
 
 	WD2793(config, m_wd2793, 16_MHz_XTAL / 16);
-	FLOPPY_CONNECTOR(config, m_floppy[0], wd2793_internal_drives, "35ssdd", wd2793_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[0], wd2793_internal_drives, "35dd", wd2793_formats).enable_sound(true);
 	FLOPPY_CONNECTOR(config, m_floppy[1], wd2793_external_drives, "dd90_352", wd2793_formats).enable_sound(true);
 
 	m_extension->option_remove("cd90_015");
