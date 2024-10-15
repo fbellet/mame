@@ -13,15 +13,17 @@
 #include "machine/6821pia.h"
 #include "machine/ram.h"
 
-#define LOG_KBD    (1U << 1) /* TO8 / TO9 / TO9+ keyboard */
-#define LOG_BANK   (1U << 2)
-#define LOG_VIDEO  (1U << 3) /* video & lightpen */
-#define LOG_EXTRA  (1U << 4)
-#define LOG_ERRORS (1U << 5)
+#define LOG_KBD		(1U << 1) /* TO8 / TO9 / TO9+ keyboard */
+#define LOG_BANK	(1U << 2)
+#define LOG_VIDEO	(1U << 3) /* video & lightpen */
+#define LOG_TAPE	(1U << 4)
+#define LOG_ERRORS	(1U << 5)
+#define LOG_FLOPPY	(1U << 6)
+#define LOG_INIT	(1U << 7)
+#define LOG_EXTRA	(1U << 8)
 
 #define VERBOSE (LOG_ERRORS)
 #include "logmacro.h"
-
 
 #define PRINT(x) osd_printf_info x
 
@@ -81,7 +83,7 @@ int thomson_state::to7_get_cassette()
 			/* hack, feed existing bits */
 			if ( bitpos >= m_to7_k7_bitsize )
 				bitpos = m_to7_k7_bitsize -1;
-			LOGMASKED(LOG_EXTRA, "$%04x %f to7_get_cassette: state=$%X pos=%f samppos=%i bit=%i\n",
+			LOGMASKED(LOG_TAPE, "$%04x %f to7_get_cassette: state=$%X pos=%f samppos=%i bit=%i\n",
 				m_maincpu->pc(), machine().time().as_double(), state, pos, bitpos,
 				m_to7_k7_bits[ bitpos ]);
 			return m_to7_k7_bits[ bitpos ];
@@ -136,14 +138,14 @@ int thomson_state::to7_get_cassette()
 
 			l = 49.*(pos-bitpos*TO7_BIT_LENGTH)/TO7_BIT_LENGTH;
 #if 1
-			LOGMASKED(LOG_EXTRA, "$%04x to7_get_cassette: state=$%X pos=%f samppos=%i+%02i bit=%i (%i) %s\n",
+			LOGMASKED(LOG_TAPE, "$%04x to7_get_cassette: state=$%X pos=%f samppos=%i+%02i bit=%i (%i) %s\n",
 				m_maincpu->pc(), state, pos, bitpos,
 				l, k, chg, data_str);
 
 			return k;
 #endif
 #if 0
-			LOGMASKED(LOG_EXTRA, "$%04x to7_get_cassette: pos=%f samppos=%i+%02i bit=%i %s\n",
+			LOGMASKED(LOG_TAPE, "$%04x to7_get_cassette: pos=%f samppos=%i+%02i bit=%i %s\n",
 				m_maincpu->pc(), pos, bitpos,
 				l, m_to7_k7_bits[bitpos], data_str);
 			return m_to7_k7_bits[ bitpos ];
@@ -166,7 +168,7 @@ void thomson_state::to7_set_cassette(int state)
 	m_cassette->output(state ? 1. : -1. );
 	cur_time=machine().time().as_double();
 	delta=cur_time-prev_time;
-	LOGMASKED(LOG_EXTRA, "$%04x to7_set_cassette: pos=%f data=%d delta=%f\n", m_maincpu->pc(), pos, state, delta);
+	LOGMASKED(LOG_TAPE, "$%04x to7_set_cassette: pos=%f data=%d delta=%f\n", m_maincpu->pc(), pos, state, delta);
 	prev_time=cur_time;
 }
 
@@ -177,7 +179,7 @@ void thomson_state::to7_set_cassette_motor(int state)
 	cassette_state cassstate =  m_cassette->get_state();
 	double pos = m_cassette->get_position();
 
-	LOG("$%04x %f to7_set_cassette_motor: cassette motor %s bitpos=%i\n",
+	LOGMASKED(LOG_TAPE, "$%04x %f to7_set_cassette_motor: cassette motor %s bitpos=%i\n",
 			m_maincpu->pc(), machine().time().as_double(), state ? "off" : "on",
 			(int) (pos / TO7_BIT_LENGTH));
 
@@ -225,7 +227,7 @@ int thomson_state::mo5_get_cassette()
 		cass->get_sample( 0, pos, 0, &hbit );
 		hbit = hbit >= 0;
 
-		LOGMASKED(LOG_EXTRA, "$%04x %f mo5_get_cassette: state=$%X pos=%f hbitpos=%i hbit=%i\n",
+		LOGMASKED(LOG_TAPE, "$%04x %f mo5_get_cassette: state=$%X pos=%f hbitpos=%i hbit=%i\n",
 			m_maincpu->pc(), machine().time().as_double(), state, pos,
 			(int) (pos / MO5_HBIT_LENGTH), hbit);
 		return hbit;
@@ -248,7 +250,7 @@ void thomson_state::mo5_set_cassette_motor(int state)
 	cassette_state cassstate = m_cassette->get_state();
 	double pos = m_cassette->get_position();
 
-	LOG("$%04x %f mo5_set_cassette_motor: cassette motor %s hbitpos=%i\n",
+	LOGMASKED(LOG_TAPE, "$%04x %f mo5_set_cassette_motor: cassette motor %s hbitpos=%i\n",
 			m_maincpu->pc(), machine().time().as_double(), state ? "off" : "on",
 			(int) (pos / MO5_HBIT_LENGTH));
 
@@ -665,7 +667,7 @@ TIMER_CALLBACK_MEMBER(thomson_state::to7_game_update_cb)
 
 void thomson_state::to7_game_init()
 {
-	LOG("to7_game_init called\n");
+	LOGMASKED(LOG_INIT, "to7_game_init called\n");
 	m_to7_game_timer = timer_alloc(FUNC(thomson_state::to7_game_update_cb), this);
 	m_to7_game_timer->adjust(TO7_GAME_POLL_PERIOD, 0, TO7_GAME_POLL_PERIOD);
 	save_item(NAME(m_to7_game_sound));
@@ -676,7 +678,7 @@ void thomson_state::to7_game_init()
 
 void thomson_state::to7_game_reset()
 {
-	LOG("to7_game_reset called\n");
+	LOGMASKED(LOG_INIT, "to7_game_reset called\n");
 	m_pia_game->ca1_w( 0 );
 	m_to7_game_sound = 0;
 	m_to7_game_mute = 0;
@@ -691,7 +693,7 @@ void thomson_state::to7_game_reset()
 
 MACHINE_RESET_MEMBER( thomson_state, to7 )
 {
-	LOG("to7: machine reset called\n");
+	LOGMASKED(LOG_INIT, "to7: machine reset called\n");
 
 	/* subsystems */
 	thom_irq_reset();
@@ -725,7 +727,7 @@ MACHINE_START_MEMBER( thomson_state, to7 )
 	uint8_t* cartmem = &m_cart_rom[0];
 	uint8_t* ram = m_ram->pointer();
 
-	LOG("to7: machine start called\n");
+	LOGMASKED(LOG_INIT, "to7: machine start called\n");
 
 	/* subsystems */
 	to7_game_init();
@@ -782,7 +784,7 @@ MACHINE_START_MEMBER( thomson_state, to7 )
 void thomson_state::to770_sys_cb2_out(int state)
 {
 	/* video overlay: black pixels are transparent and show TV image underneath */
-	LOG("$%04x to770_sys_cb2_out: video overlay %i\n", m_maincpu->pc(), state);
+	LOGMASKED(LOG_VIDEO, "$%04x to770_sys_cb2_out: video overlay %i\n", m_maincpu->pc(), state);
 }
 
 
@@ -913,7 +915,7 @@ void thomson_state::to770_gatearray_w(offs_t offset, uint8_t data)
 
 MACHINE_RESET_MEMBER( thomson_state, to770 )
 {
-	LOG("to770: machine reset called\n");
+	LOGMASKED(LOG_INIT, "to770: machine reset called\n");
 
 	/* subsystems */
 	thom_irq_reset();
@@ -949,7 +951,7 @@ MACHINE_START_MEMBER( thomson_state, to770 )
 	uint8_t* cartmem = &m_cart_rom[0];
 	uint8_t* ram = m_ram->pointer();
 
-	LOG("to770: machine start called\n");
+	LOGMASKED(LOG_INIT, "to770: machine start called\n");
 
 	/* subsystems */
 	to7_game_init();
@@ -1290,7 +1292,7 @@ void mo5_state::mo5_ext_w(uint8_t data)
 
 MACHINE_RESET_MEMBER( mo5_state, mo5 )
 {
-	LOG("mo5: machine reset called\n");
+	LOGMASKED(LOG_INIT, "mo5: machine reset called\n");
 
 	/* subsystems */
 	thom_irq_reset();
@@ -1323,7 +1325,7 @@ MACHINE_START_MEMBER( mo5_state, mo5 )
 	uint8_t* cartmem = &m_cart_rom[0];
 	uint8_t* ram = m_ram->pointer();
 
-	LOG("mo5: machine start called\n");
+	LOGMASKED(LOG_INIT, "mo5: machine start called\n");
 
 	/* subsystems */
 	to7_game_init();
@@ -1765,7 +1767,7 @@ void to9_state::to9_sys_portb_out(uint8_t data)
 	to9_update_ram_bank();
 
 	if ( data & 4 ) /* bit 2: video overlay (TODO) */
-		LOG("to9_sys_portb_out: video overlay not handled\n");
+		LOGMASKED(LOG_VIDEO, "to9_sys_portb_out: video overlay not handled\n");
 }
 
 
@@ -1812,7 +1814,7 @@ void to9_state::wd2793_control_w(u8 data)
 	m_wd2793->dden_w(BIT(data, 7));
 	m_wd2793_control = data;
 
-	LOG("%f $%04x wd2793_control_w: $%02X set drive=%i side=%i density=%s\n",
+	LOGMASKED(LOG_FLOPPY, "%f $%04x wd2793_control_w: $%02X set drive=%i side=%i density=%s\n",
 		machine().time().as_double(), m_maincpu->pc(), data, drive, side,
 		(BIT(data, 7) ? "FM" : "MFM"));
 }
@@ -1828,7 +1830,7 @@ u8 to9_state::wd2793_control_r()
 
 MACHINE_RESET_MEMBER( to9_state, to9 )
 {
-	LOG("to9: machine reset called\n");
+	LOGMASKED(LOG_INIT, "to9: machine reset called\n");
 
 	/* subsystems */
 	thom_irq_reset();
@@ -1871,7 +1873,7 @@ MACHINE_START_MEMBER( to9_state, to9 )
 	uint8_t* cartmem = &m_cart_rom[0];
 	uint8_t* ram = m_ram->pointer();
 
-	LOG("to9: machine start called\n");
+	LOGMASKED(LOG_INIT, "to9: machine start called\n");
 
 	/* subsystems */
 	to7_game_init();
@@ -2390,7 +2392,7 @@ void to9_state::to8_sys_portb_out(uint8_t data)
 	to8_update_ram_bank();
 
 	if ( data & 4 ) /* bit 2: video overlay (TODO) */
-		LOG("to8_sys_portb_out: video overlay not handled\n");
+		LOGMASKED(LOG_VIDEO, "to8_sys_portb_out: video overlay not handled\n");
 }
 
 
@@ -2458,7 +2460,7 @@ void to9_state::to8_lightpen_cb( int step )
 
 MACHINE_RESET_MEMBER( to9_state, to8 )
 {
-	LOG("to8: machine reset called\n");
+	LOGMASKED(LOG_INIT, "to8: machine reset called\n");
 
 	/* subsystems */
 	thom_irq_reset();
@@ -2505,7 +2507,7 @@ MACHINE_START_MEMBER( to9_state, to8 )
 	uint8_t* cartmem = &m_cart_rom[0];
 	uint8_t* ram = m_ram->pointer();
 
-	LOG("to8: machine start called\n");
+	LOGMASKED(LOG_INIT, "to8: machine start called\n");
 
 	/* subsystems */
 	to7_game_init();
@@ -2605,7 +2607,7 @@ void to9_state::to9p_timer_port_out(uint8_t data)
 
 MACHINE_RESET_MEMBER( to9_state, to9p )
 {
-	LOG("to9p: machine reset called\n");
+	LOGMASKED(LOG_INIT, "to9p: machine reset called\n");
 
 	/* subsystems */
 	thom_irq_reset();
@@ -2651,7 +2653,7 @@ MACHINE_START_MEMBER( to9_state, to9p )
 	uint8_t* cartmem = &m_cart_rom[0];
 	uint8_t* ram = m_ram->pointer();
 
-	LOG("to9p: machine start called\n");
+	LOGMASKED(LOG_INIT, "to9p: machine start called\n");
 
 	/* subsystems */
 	to7_game_init();
@@ -2990,7 +2992,7 @@ void mo6_state::mo6_centronics_busy(int state)
 
 void mo6_state::mo6_game_porta_out(uint8_t data)
 {
-	LOG("$%04x %f mo6_game_porta_out: CENTRONICS set data=$%02X\n", m_maincpu->pc(), machine().time().as_double(), data);
+	LOGMASKED(LOG_EXTRA, "$%04x %f mo6_game_porta_out: CENTRONICS set data=$%02X\n", m_maincpu->pc(), machine().time().as_double(), data);
 
 	/* centronics data */
 	m_cent_data_out->write(data);
@@ -3000,7 +3002,7 @@ void mo6_state::mo6_game_porta_out(uint8_t data)
 
 void mo6_state::mo6_game_cb2_out(int state)
 {
-	LOG("$%04x %f mo6_game_cb2_out: CENTRONICS set strobe=%i\n", m_maincpu->pc(), machine().time().as_double(), state);
+	LOGMASKED(LOG_EXTRA, "$%04x %f mo6_game_cb2_out: CENTRONICS set strobe=%i\n", m_maincpu->pc(), machine().time().as_double(), state);
 
 	/* centronics strobe */
 	m_centronics->write_strobe(state);
@@ -3030,7 +3032,7 @@ TIMER_CALLBACK_MEMBER(mo6_state::mo6_game_update_cb)
 
 void mo6_state::mo6_game_init()
 {
-	LOG("mo6_game_init called\n");
+	LOGMASKED(LOG_INIT, "mo6_game_init called\n");
 	m_to7_game_timer = timer_alloc(FUNC(mo6_state::mo6_game_update_cb), this);
 	m_to7_game_timer->adjust(TO7_GAME_POLL_PERIOD, 0, TO7_GAME_POLL_PERIOD);
 	save_item(NAME(m_to7_game_sound));
@@ -3041,7 +3043,7 @@ void mo6_state::mo6_game_init()
 
 void mo6_state::mo6_game_reset()
 {
-	LOG("mo6_game_reset called\n");
+	LOGMASKED(LOG_INIT, "mo6_game_reset called\n");
 	m_pia_game->ca1_w( 0 );
 	m_to7_game_sound = 0;
 	m_to7_game_mute = 0;
@@ -3098,7 +3100,7 @@ void mo6_state::mo6_sys_porta_out(uint8_t data)
 void mo6_state::mo6_sys_cb2_out(int state)
 {
 	/* SCART pin 8 = slow switch (?) */
-	LOG("mo6_sys_cb2_out: SCART slow switch set to %i\n", state);
+	LOGMASKED(LOG_VIDEO, "mo6_sys_cb2_out: SCART slow switch set to %i\n", state);
 }
 
 
@@ -3284,7 +3286,7 @@ void mo6_state::mo6_vreg_w(offs_t offset, uint8_t data)
 
 MACHINE_RESET_MEMBER( mo6_state, mo6 )
 {
-	LOG("mo6: machine reset called\n");
+	LOGMASKED(LOG_INIT, "mo6: machine reset called\n");
 
 	/* subsystems */
 	thom_irq_reset();
@@ -3326,7 +3328,7 @@ MACHINE_START_MEMBER( mo6_state, mo6 )
 	uint8_t* cartmem = &m_cart_rom[0];
 	uint8_t* ram = m_ram->pointer();
 
-	LOG("mo6: machine start called\n");
+	LOGMASKED(LOG_INIT, "mo6: machine start called\n");
 
 	/* subsystems */
 	mo6_game_init();
@@ -3425,7 +3427,7 @@ void mo5nr_state::mo5nr_sys_porta_out(uint8_t data)
 
 void mo5nr_state::mo5nr_game_init()
 {
-	LOG("mo5nr_game_init called\n");
+	LOGMASKED(LOG_INIT, "mo5nr_game_init called\n");
 	m_to7_game_timer = timer_alloc(FUNC(mo5nr_state::mo6_game_update_cb), this);
 	m_to7_game_timer->adjust( TO7_GAME_POLL_PERIOD, 0, TO7_GAME_POLL_PERIOD );
 	save_item(NAME(m_to7_game_sound));
@@ -3436,7 +3438,7 @@ void mo5nr_state::mo5nr_game_init()
 
 void mo5nr_state::mo5nr_game_reset()
 {
-	LOG("mo5nr_game_reset called\n");
+	LOGMASKED(LOG_INIT, "mo5nr_game_reset called\n");
 	m_pia_game->ca1_w( 0 );
 	m_to7_game_sound = 0;
 	m_to7_game_mute = 0;
@@ -3455,7 +3457,7 @@ uint8_t mo5nr_state::id_r()
 
 MACHINE_RESET_MEMBER( mo5nr_state, mo5nr )
 {
-	LOG("mo5nr: machine reset called\n");
+	LOGMASKED(LOG_INIT, "mo5nr: machine reset called\n");
 
 	m_extension_view.select(m_nanoreseau_config->read() & 1);
 
@@ -3499,7 +3501,7 @@ MACHINE_START_MEMBER( mo5nr_state, mo5nr )
 	uint8_t* cartmem = &m_cart_rom[0];
 	uint8_t* ram = m_ram->pointer();
 
-	LOG("mo5nr: machine start called\n");
+	LOGMASKED(LOG_INIT, "mo5nr: machine start called\n");
 
 	/* subsystems */
 	mo5nr_game_init();
