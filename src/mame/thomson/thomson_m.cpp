@@ -22,7 +22,7 @@
 #define LOG_INIT	(1U << 7)
 #define LOG_EXTRA	(1U << 8)
 
-#define VERBOSE (LOG_ERRORS)
+#define VERBOSE (LOG_ERRORS|LOG_FLOPPY)
 #include "logmacro.h"
 
 #define PRINT(x) osd_printf_info x
@@ -1785,38 +1785,53 @@ void to9_state::to9_timer_port_out(uint8_t data)
 
 /* ------------ WD2793 (floppy) ------------ */
 
-void to9_state::wd2793_control_w(u8 data)
+TIMER_CALLBACK_MEMBER(to9_state::floppy_motor_off)
 {
-	// drive select
-	int drive = -1, side = 0;
+	LOGMASKED(LOG_FLOPPY, "%f floppy %d motor off\n", machine().time().as_double(), param);
+	m_floppy[param]->get_device()->mon_w(1);
+}
+
+void to9_state::floppy_motor_on(offs_t offset, u8 &data, u8 mem_mask)
+{
 	floppy_image_device *floppy = nullptr;
 
-	drive = BIT(data,2);
-	side = BIT(data, 0);
-	switch (data & 7)
-	{
-	case 0: break;
-	case 2: drive = 0; side = 0; floppy = m_floppy[0]->get_device(); break;
-	/* Internal floppy drive is single sided only */
-	case 3: drive = 0; side = 1; floppy = nullptr; break;
-	case 4: drive = 1; side = 0; floppy = m_floppy[1]->get_device(); break;
-	case 5: drive = 1; side = 1; floppy = m_floppy[1]->get_device(); break;
-	default:
-		LOGMASKED(LOG_ERRORS, "%f $%04x wd2793_control_w: invalid drive select pattern $%02X\n",
-			machine().time().as_double(), m_maincpu->pc(), data);
-	}
-	if(floppy)
-	{
+	if (machine().side_effects_disabled())
+		return;
+
+	if(m_drive_select >=0) {
+		floppy = m_floppy[m_drive_select]->get_device();
 		floppy->mon_w(0);
-		floppy->ss_w(side);
+		if(floppy_motor_timer[m_drive_select]->expire().is_never())
+			LOGMASKED(LOG_FLOPPY, "%f $%04x floppy %d motor on\n",
+					machine().time().as_double(), m_maincpu->pc(), m_drive_select);
+		floppy_motor_timer[m_drive_select]->adjust(attotime::from_seconds(3), m_drive_select);
 	}
+}
+
+void to9_state::wd2793_control_w(u8 data)
+{
+	floppy_image_device *floppy = nullptr;
+
+	if((data & 3) == 2)
+		/* Internal floppy drive is single sided only */
+		m_drive_select = 0;
+	else if(data & 4)
+		m_drive_select = 1;
+	else
+		m_drive_select = -1;
+
+	if(m_drive_select >= 0) {
+		floppy = m_floppy[m_drive_select]->get_device();
+		floppy->ss_w(data & 1);
+	}
+
 	m_wd2793->set_floppy(floppy);
-	m_wd2793->dden_w(BIT(data, 7));
+	m_wd2793->dden_w(data & 0x80 ? 1 : 0);
 	m_wd2793_control = data;
 
-	LOGMASKED(LOG_FLOPPY, "%f $%04x wd2793_control_w: $%02X set drive=%i side=%i density=%s\n",
-		machine().time().as_double(), m_maincpu->pc(), data, drive, side,
-		(BIT(data, 7) ? "FM" : "MFM"));
+	LOGMASKED(LOG_FLOPPY, "%f $%04x wd2793_control_w: $%02x drive=%d side=%d density=%s\n",
+			machine().time().as_double(), m_maincpu->pc(), data, m_drive_select,
+			data & 1, data & 0x80 ? "FM" : "MFM");
 }
 
 u8 to9_state::wd2793_control_r()
@@ -1878,6 +1893,8 @@ MACHINE_START_MEMBER( to9_state, to9 )
 	/* subsystems */
 	to7_game_init();
 	to9_palette_init();
+	floppy_motor_timer[0] = timer_alloc(FUNC(to9_state::floppy_motor_off), this);
+	floppy_motor_timer[1] = timer_alloc(FUNC(to9_state::floppy_motor_off), this);
 
 	m_extension->rom_map(m_maincpu->space(AS_PROGRAM), 0xe000, 0xe7bf);
 	m_extension->io_map (m_maincpu->space(AS_PROGRAM), 0xe7c0, 0xe7ff);
@@ -1895,6 +1912,19 @@ MACHINE_START_MEMBER( to9_state, to9 )
 	m_basebank->set_entry( 0 );
 	m_rambank->set_entry( 0 );
 
+	address_space& space = m_maincpu->space(AS_PROGRAM);
+	space.install_readwrite_tap(0xe7d0, 0xe7d3, "floppy motor cmd",
+		[this](offs_t offset, u8 &data, u8 mem_mask)
+		{
+			if (!machine().side_effects_disabled())
+				to9_state::floppy_motor_on(offset, data, mem_mask);
+		},
+		[this](offs_t offset, u8 &data, u8 mem_mask)
+		{
+			if (!machine().side_effects_disabled())
+				to9_state::floppy_motor_on(offset, data, mem_mask);
+		});
+
 	/* save-state */
 	save_item(NAME(m_thom_cart_nb_banks));
 	save_item(NAME(m_thom_cart_bank));
@@ -1905,6 +1935,7 @@ MACHINE_START_MEMBER( to9_state, to9 )
 	machine().save().register_postload(save_prepost_delegate(FUNC(to9_state::to9_update_ram_bank_postload), this));
 	machine().save().register_postload(save_prepost_delegate(FUNC(to9_state::to9_update_cart_bank_postload), this));
 	save_item(NAME(m_wd2793_control));
+	save_item(NAME(m_drive_select));
 }
 
 

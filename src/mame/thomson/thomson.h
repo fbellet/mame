@@ -503,6 +503,11 @@ protected:
 	void wd2793_control_w(u8 data);
 	u8 wd2793_control_r();
 	u8 m_wd2793_control;
+
+	int m_drive_select = 0;
+	emu_timer *floppy_motor_timer[2];
+	TIMER_CALLBACK_MEMBER( floppy_motor_off );
+	void floppy_motor_on(offs_t offset, u8 &data, u8 mem_mask);
 };
 
 class mo6_state : public to9_state
