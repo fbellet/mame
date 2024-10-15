@@ -520,7 +520,6 @@ static int cmd_put(const struct command *c, int argc, char *argv[])
 #ifdef IMGTOOL_DEBUG
 		util::stream_format(std::wcout, L"cmd_put(): filename=\"%s\"\n", wstring_from_utf8(filename));
 #endif // IMGTOOL_DEBUG
-		util::stream_format(std::wcout, L"Putting file '%s'...\n", wstring_from_utf8(filename));
 		err = partition->put_file(new_filename, fork, filename, resolution.get(), filter);
 		if (err)
 			goto done;
@@ -580,7 +579,9 @@ static int cmd_getall(const struct command *c, int argc, char *argv[])
 
 	while (((err = imgenum->get_next(ent)) == 0) && !ent.eof)
 	{
-		util::stream_format(std::wcout, L"Retrieving %s (%u bytes)\n", wstring_from_utf8(ent.filename), (unsigned int)ent.filesize);
+#ifdef IMGTOOL_DEBUG
+		util::stream_format(std::wcout, L"cmd_getall(): retrieving %s (%u bytes)\n", wstring_from_utf8(ent.filename), (unsigned int)ent.filesize);
+#endif // IMGTOOL_DEBUG
 
 		err = partition->get_file(ent.filename, nullptr, nullptr, filter);
 		if (err)
@@ -1067,8 +1068,6 @@ int main(int argc, char *argv[])
 	argv = (char **)alloca(sizeof(char *) * args.size());
 	for (i = 0; i < args.size(); i++)
 		argv[i] = (char *)args[i].c_str();
-
-	util::stream_format(std::wcout, L"\n");
 
 	if (argc > 1)
 	{
