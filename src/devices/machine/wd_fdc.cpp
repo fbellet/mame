@@ -2628,7 +2628,7 @@ void wd_fdc_digital_device_base::digital_pll_t::start_writing(const attotime &tm
 
 void wd_fdc_digital_device_base::digital_pll_t::stop_writing(floppy_image_device *floppy, const attotime &tm)
 {
-	commit(floppy, tm);
+	commit(floppy, tm, true); // force flux flush
 	write_start_time = attotime::never;
 }
 
@@ -2662,15 +2662,17 @@ bool wd_fdc_digital_device_base::digital_pll_t::write_next_bit(bool bit, attotim
 	return false;
 }
 
-void wd_fdc_digital_device_base::digital_pll_t::commit(floppy_image_device *floppy, const attotime &tm)
+void wd_fdc_digital_device_base::digital_pll_t::commit(floppy_image_device *floppy, const attotime &tm, bool flush_flux)
 {
 	if(write_start_time.is_never() || tm == write_start_time)
 		return;
 
-	if(floppy)
-		floppy->write_flux(write_start_time, tm, write_position, write_buffer);
-	write_start_time = tm;
-	write_position = 0;
+	if(flush_flux || write_position == std::size(write_buffer)) {
+		if(floppy)
+			floppy->write_flux(write_start_time, tm, write_position, write_buffer);
+		write_start_time = tm;
+		write_position = 0;
+	}
 }
 
 fd1771_device::fd1771_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) : wd_fdc_analog_device_base(mconfig, FD1771, tag, owner, clock)

@@ -546,7 +546,7 @@ bool thmfc1_device::write_one_bit_floppy(u64 limit)
 
 	if(m_bit)
 		m_write_buffer[m_write_buffer_idx++] = cycles_to_time (m_window_start + (((m_cell & 0x7f) + 1) >> 1));
-	if(m_write_buffer_idx == 128) {
+	if(m_write_buffer_idx == std::size(m_write_buffer)) {
 		m_cur_floppy->write_flux(cycles_to_time(m_write_buffer_start), cycles_to_time(window_end), m_write_buffer_idx, m_write_buffer);
 		m_write_buffer_idx = 0;
 		m_write_buffer_start = window_end;

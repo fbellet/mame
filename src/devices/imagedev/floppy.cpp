@@ -1152,6 +1152,9 @@ bool floppy_image_device::writing_disabled() const
 
 void floppy_image_device::write_flux(const attotime &start, const attotime &end, int transition_count, const attotime *transitions)
 {
+	//static int count = 0;
+	//logerror("%s write_flux #%d %d transitions in %s seconds\n", machine().time().to_string(), count++,
+	//		transition_count, (end - start).to_string());
 	if(!m_image || m_mon)
 		return;
 

@@ -92,7 +92,7 @@ private:
 
 	bool m_use_shift_clk_reg;
 
-	attotime m_write_buffer[128];
+	attotime m_write_buffer[2500];
 	u64 m_write_buffer_start;
 	int m_write_buffer_idx;
 

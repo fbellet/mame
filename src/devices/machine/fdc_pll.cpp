@@ -35,19 +35,21 @@ void fdc_pll_t::start_writing(const attotime &tm)
 
 void fdc_pll_t::stop_writing(floppy_image_device *floppy, const attotime &tm)
 {
-	commit(floppy, tm);
+	commit(floppy, tm, true); // force flux flush
 	write_start_time = attotime::never;
 }
 
-void fdc_pll_t::commit(floppy_image_device *floppy, const attotime &tm)
+void fdc_pll_t::commit(floppy_image_device *floppy, const attotime &tm, bool flush_flux)
 {
 	if(write_start_time.is_never() || tm == write_start_time)
 		return;
 
-	if(floppy)
-		floppy->write_flux(write_start_time, tm, write_position, write_buffer);
-	write_start_time = tm;
-	write_position = 0;
+	if(flush_flux || write_position == std::size(write_buffer)) {
+                if (floppy)
+                        floppy->write_flux(write_start_time, tm, write_position, write_buffer);
+                write_start_time = tm;
+                write_position = 0;
+        }
 }
 
 int fdc_pll_t::get_next_bit(attotime &tm, floppy_image_device *floppy, const attotime &limit)
@@ -129,6 +131,8 @@ bool fdc_pll_t::write_next_bit(bool bit, attotime &tm, floppy_image_device *flop
 
 	if(bit && write_position < std::size(write_buffer))
 		write_buffer[write_position++] = ctime + period/2;
+	if(write_position == std::size(write_buffer))
+		commit(floppy, etime);
 
 	tm = etime;
 	ctime = etime;

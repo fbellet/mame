@@ -421,7 +421,7 @@ private:
 		attotime delays[42];
 
 		attotime write_start_time;
-		attotime write_buffer[32];
+		attotime write_buffer[2500];
 		int write_position;
 
 		void set_clock(const attotime &period);
@@ -429,7 +429,7 @@ private:
 		int get_next_bit(attotime &tm, floppy_image_device *floppy, const attotime &limit);
 		bool write_next_bit(bool bit, attotime &tm, floppy_image_device *floppy, const attotime &limit);
 		void start_writing(const attotime &tm);
-		void commit(floppy_image_device *floppy, const attotime &tm);
+		void commit(floppy_image_device *floppy, const attotime &tm, bool flush_flux = false);
 		void stop_writing(floppy_image_device *floppy, const attotime &tm);
 	};
 
