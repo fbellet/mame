@@ -444,6 +444,8 @@ void wd177x_format::check_compatibility(const floppy_image &image, std::vector<i
 	int *ok_cands = &candidates[0];
 	for(unsigned int i=0; i < candidates.size(); i++) {
 		const format &f = formats[candidates[i]];
+		// Checking every track is time consuming, we only test some
+		const int tracks[] = { 0, 1, 20, f.track_count - 1 };
 
 		int max_tracks, max_heads;
 		image.get_maximal_geometry(max_tracks, max_heads);
@@ -453,7 +455,8 @@ void wd177x_format::check_compatibility(const floppy_image &image, std::vector<i
 			goto fail;
 		}
 
-		for(int track=0; track < f.track_count; track++) {
+		for(int i=0; i < std::size(tracks); i++) {
+			int track = tracks[i];
 			for(int head=0; head < f.head_count; head++) {
 				const format &tf = get_track_format(f, head, track);
 
