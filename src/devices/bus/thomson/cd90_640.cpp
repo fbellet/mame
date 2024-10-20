@@ -3,7 +3,7 @@
 
 // CD 90-640 - Floppy drive controller built from a wd1770
 //
-// Handles up to two 5.25 dual-sided drives (one DD 90-320 a second SD
+// Handles up to two 5.25 dual-sided drives (one DD 90-320 a second DS
 // 90-640 with the same specs)
 
 #include "emu.h"
@@ -46,10 +46,14 @@ const tiny_rom_entry *cd90_640_device::device_rom_region() const
 	return ROM_NAME(cd90_640);
 }
 
-void cd90_640_device::floppy_drives(device_slot_interface &device)
+void cd90_640_device::floppy_first_drive(device_slot_interface &device)
 {
 	device.option_add("dd90_320", FLOPPY_525_DD);
-	device.option_add("sd90_640", FLOPPY_525_DD);
+}
+
+void cd90_640_device::floppy_second_drive(device_slot_interface &device)
+{
+	device.option_add("ds90_640", FLOPPY_525_DD);
 }
 
 void cd90_640_device::floppy_formats(format_registration &fr)
@@ -61,8 +65,8 @@ void cd90_640_device::floppy_formats(format_registration &fr)
 void cd90_640_device::device_add_mconfig(machine_config &config)
 {
 	WD1770(config, m_wd1770, 8_MHz_XTAL);
-	FLOPPY_CONNECTOR(config, m_floppy[0], floppy_drives, "dd90_320", floppy_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, m_floppy[1], floppy_drives, "sd90_640", floppy_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[0], floppy_first_drive, "dd90_320", floppy_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, m_floppy[1], floppy_second_drive, "ds90_640", floppy_formats).enable_sound(true);
 }
 
 void cd90_640_device::device_start()

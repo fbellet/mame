@@ -39,7 +39,8 @@ private:
 	u8 control_r();
 
 	static void floppy_formats(format_registration &fr);
-	static void floppy_drives(device_slot_interface &device);
+	static void floppy_first_drive(device_slot_interface &device);
+	static void floppy_second_drive(device_slot_interface &device);
 };
 
 DECLARE_DEVICE_TYPE(CD90_640, cd90_640_device)
