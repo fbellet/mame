@@ -38,7 +38,7 @@ void cq90_028_device::rom_map(address_map &map)
 void cq90_028_device::io_map(address_map &map)
 {
 	map(0x10, 0x11).rw(m_mc6852, FUNC(mc6852_device::read), FUNC(mc6852_device::write));
-	map(0x18, 0x18).rw(FUNC(cq90_028_device::status_r), FUNC(cq90_028_device::wrga_w));
+	map(0x18, 0x18).rw(FUNC(cq90_028_device::status_r), FUNC(cq90_028_device::wg_w));
 	map(0x1c, 0x1c).w(FUNC(cq90_028_device::reg_w));
 }
 
@@ -59,9 +59,8 @@ void cq90_028_device::device_start()
 {
 	m_byte_timer = timer_alloc(FUNC(cq90_028_device::byte_timer), this);
 	m_byte_timer->adjust(attotime::zero, 0, attotime::from_hz(QDD_BITRATE / 8));
-	m_byte_timer->enable(1);
 
-	save_item(NAME(m_wrga));
+	save_item(NAME(m_wg));
 	save_item(NAME(m_reg));
 	save_item(NAME(m_status));
 }
@@ -70,16 +69,16 @@ void cq90_028_device::device_reset()
 {
 	m_mc6852->reset();
 	m_mc6852->set_data_bus_reversed(true);
-	m_wrga = 0;
+	m_wg = 0;
 	m_reg = 0;
 	m_status = 0;
 }
 
-void cq90_028_device::wrga_w(uint8_t data)
+void cq90_028_device::wg_w(uint8_t data)
 {
-	m_wrga = data;
-	m_qdd->write_gate_w(data & 0x80 ? 0 : 1);
-	LOG("wrga_w %02x\n", data);
+	m_wg = data;
+	m_qdd->wg_w(data & 0x80 ? 0 : 1);
+	LOG("wg_w %02x\n", data);
 }
 
 void cq90_028_device::reg_w(uint8_t data)
@@ -93,9 +92,9 @@ uint8_t cq90_028_device::status_r()
 	// 40 = disk absent
 	// 80 = drive not ready
 	m_status = 0;
-	if(!m_qdd->disk_present_r())
+	if(m_qdd->ms_r())
 		m_status |= 0x40;
-	if(!m_qdd->ready_r())
+	if(m_qdd->ry_r())
 		m_status |= 0x80;
 
 	if(!machine().side_effects_disabled()) {
@@ -112,19 +111,18 @@ uint8_t cq90_028_device::status_r()
 TIMER_CALLBACK_MEMBER(cq90_028_device::byte_timer)
 {
 	// MTONN is wired to SM/DTRN of mc6852
-	uint8_t motor_on = (m_mc6852->sm_dtr_r() ? 0 : 1);
-	m_qdd->motor_on_w(motor_on);
+	uint8_t mo = m_mc6852->sm_dtr_r();
+	m_qdd->mo_w(mo);
 
 	// and WRPRN is wired to CTSN of mc6852
-	uint8_t write_protected = m_qdd->write_protected_r();
-	m_mc6852->cts_w(write_protected);
+	m_mc6852->cts_w(m_qdd->wp_r());
 
-	if (motor_on) {
-		if ((m_wrga & 0x80) == 0) {
+	if(!mo) {
+		if(~m_wg & 0x80) {
 			int tuf;
 			uint8_t data;
 			data = m_mc6852->get_tx_byte(&tuf);
-			if (!tuf)
+			if(!tuf)
 				m_qdd->write(data);
 		}
 		m_mc6852->receive_byte(m_qdd->read());

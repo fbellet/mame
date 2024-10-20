@@ -38,11 +38,11 @@ public:
 	virtual const char *image_interface() const noexcept override { return "qdd"; }
 	virtual const char *file_extensions() const noexcept override { return "qd"; }
 
-	uint8_t ready_r() { return m_ready; }
-	uint8_t disk_present_r () { return m_disk_present; }
-	uint8_t write_protected_r() { return m_write_protected; }
-	void write_gate_w(int state) { m_write_gate = state; }
-	void motor_on_w(int state);
+	uint8_t ry_r() { return m_ry; }
+	uint8_t ms_r () { return m_ms; }
+	uint8_t wp_r() { return m_wp; }
+	void wg_w(int state) { m_wg = state; }
+	void mo_w(int state);
 	attotime byte_timer_start() { return m_byte_timer->start(); }
 	attotime byte_timer_expire() { return m_byte_timer->expire(); }
 
@@ -59,15 +59,13 @@ protected:
 
 private:
 	std::unique_ptr<uint8_t[]> m_track_buffer;
-
 	int m_byte_offset;
-	int m_motor_cmd;
 
-	int m_disk_present;
-	int m_motor_on;
-	int m_ready;
-	int m_write_gate;
-	int m_write_protected;
+	int m_ms;	// Media sense (active low)
+	int m_mo;	// Motor on (active low)
+	int m_wg;	// Write gate (active high)
+	int m_wp;	// Write protected (active high)
+	int m_ry;	// Ready (active low)
 	int m_dirty;
 
 	emu_timer *m_byte_timer;

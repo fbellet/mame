@@ -193,7 +193,7 @@ void thmfc1_device::cmd0_w(u8 data)
 		break;
 	}
 	if(m_cur_qdd)
-		m_cur_qdd->write_gate_w(m_cmd0 & C0_WGC);
+		m_cur_qdd->wg_w(m_cmd0 & C0_WGC);
 }
 
 void thmfc1_device::cmd1_w(u8 data)
@@ -236,13 +236,13 @@ void thmfc1_device::cmd2_w(u8 data)
 	}
 
 	if(m_cur_qdd)
-		m_cur_qdd->motor_on_w(m_cmd2 & C2_SISELB);
+		m_cur_qdd->mo_w(m_cmd2 & C2_SISELB ? 0 : 1);
 	else if(m_cur_floppy) {
 		int i = (m_cmd2 & C2_DRS1 ? 1 : 0);
 		if(m_cmd2 & C2_MTON) {
 			m_cur_floppy->mon_w(0);
 			m_motor_timer[i]->adjust(attotime::never);
-		} else if (prev & C2_MTON)
+		} else if(prev & C2_MTON)
 			m_motor_timer[i]->adjust(attotime::from_seconds(2), i);
 		m_cur_floppy->ss_w(m_cmd2 & C2_SISELB ? 0 : 1);
 		m_cur_floppy->dir_w(m_cmd2 & C2_DIRECB ? 0 : 1);
@@ -313,14 +313,14 @@ u8 thmfc1_device::stat1_r()
 {
 	u8 res = 0;
 	if(m_cur_qdd) {
-		if(!m_cur_qdd->disk_present_r())
+		if(m_cur_qdd->ms_r())
 			res |= S1_INDX;
 		if(m_cmd2 & C2_SISELB)
 			res |= S1_MTON;
 		res |= S1_TRK0;
-		if(m_cur_qdd->write_protected_r())
+		if(m_cur_qdd->wp_r())
 			res |= S1_WPRT;
-		if(m_cur_qdd->ready_r())
+		if(!m_cur_qdd->ry_r())
 			res |= S1_RDY;
 	} else if(m_cur_floppy) {
 		if(m_cur_floppy->idx_r())
@@ -373,7 +373,7 @@ attotime thmfc1_device::cycles_to_time(u64 cycles) const
 
 bool thmfc1_device::read_one_bit(u64 limit, u64 &next_flux_change)
 {
-	if (m_cur_qdd)
+	if(m_cur_qdd)
 		return read_one_bit_qdd(limit);
 	else
 		return read_one_bit_floppy(limit, next_flux_change);
@@ -396,7 +396,7 @@ bool thmfc1_device::read_one_bit_qdd(u64 limit)
 
 	u64 start = time_to_cycles(m_cur_qdd->byte_timer_start());
 	u64 expire = time_to_cycles(m_cur_qdd->byte_timer_expire());
-	if (!m_cur_qdd->byte_timer_expire().is_never()) {
+	if(!m_cur_qdd->byte_timer_expire().is_never()) {
 		LOGQDD("QDD byte_timer %s [ %d .. %d ]\n", machine().time().to_string(), start, expire);
 		window_end = expire - (4 * 16000000 / QDD_BITRATE);
 	}
@@ -432,7 +432,7 @@ bool thmfc1_device::read_one_bit_floppy(u64 limit, u64 &next_flux_change)
 
 	m_last_sync = window_end;
 
-	if (m_cur_floppy == nullptr)
+	if(m_cur_floppy == nullptr)
 		return false;
 
 	m_shift_reg = (m_shift_reg << 1) | m_bit;
@@ -452,7 +452,7 @@ bool thmfc1_device::read_one_bit_floppy(u64 limit, u64 &next_flux_change)
 	m_bit_counter++;
 	m_bit_counter &= 0xf;
 
-	if ((m_cmd0 & C0_ENSYN) && ((~m_cmd1 & C1_DSYRD) || !m_cur_floppy->ready_r())) {
+	if((m_cmd0 & C0_ENSYN) && ((~m_cmd1 & C1_DSYRD) || !m_cur_floppy->ready_r())) {
 		if((m_shift_data_reg == m_wdata && m_shift_clk_reg == m_clk) ||
 				(m_shift_data_reg == m_clk && m_shift_clk_reg == m_wdata)) {
 			m_stat0 |= S0_SYNC;
@@ -472,7 +472,7 @@ bool thmfc1_device::read_one_bit_floppy(u64 limit, u64 &next_flux_change)
 
 bool thmfc1_device::write_one_bit(u64 limit)
 {
-	if (m_cur_qdd)
+	if(m_cur_qdd)
 		return write_one_bit_qdd(limit);
 	else
 		return write_one_bit_floppy(limit);
@@ -494,7 +494,7 @@ bool thmfc1_device::write_one_bit_qdd(u64 limit)
 
 	u64 start = time_to_cycles(m_cur_qdd->byte_timer_start());
 	u64 expire = time_to_cycles(m_cur_qdd->byte_timer_expire());
-	if (!m_cur_qdd->byte_timer_expire().is_never()) {
+	if(!m_cur_qdd->byte_timer_expire().is_never()) {
 		LOGQDD("QDD byte_timer %s [ %d .. %d ]\n", machine().time().to_string(), start, expire);
 		window_end = expire - (4 * 16000000 / QDD_BITRATE);
 	}
@@ -782,9 +782,9 @@ void thmfc1_device::sync()
 		case S_WRITE_SECTOR: {
 			bool overflow = m_stat0 & S0_DREQ;
 			if(m_bit_counter == 0) {
-				if (m_shift_data_reg != m_wdata)
+				if(m_shift_data_reg != m_wdata)
 					m_use_shift_clk_reg = false;
-				if (m_shift_clk_reg != m_clk && m_clk < 0xff)
+				if(m_shift_clk_reg != m_clk && m_clk < 0xff)
 					m_use_shift_clk_reg = true;
 				m_shift_data_reg = m_wdata;
 				m_shift_clk_reg = m_clk;
@@ -830,9 +830,9 @@ void thmfc1_device::sync()
 
 		case S_FORMAT:
 			if(m_bit_counter == 0) {
-				if (m_shift_data_reg != m_wdata)
+				if(m_shift_data_reg != m_wdata)
 					m_use_shift_clk_reg = false;
-				if (m_shift_clk_reg != m_clk && m_clk < 0xff)
+				if(m_shift_clk_reg != m_clk && m_clk < 0xff)
 					m_use_shift_clk_reg = true;
 				m_shift_data_reg = m_wdata;
 				m_shift_clk_reg = m_clk;

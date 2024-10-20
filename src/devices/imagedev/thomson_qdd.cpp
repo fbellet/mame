@@ -80,23 +80,22 @@ void thomson_qdd_image_device::device_start()
 
 	// allocate timers
 	m_byte_timer = timer_alloc(FUNC(thomson_qdd_image_device::byte_timer), this);
-
 	save_item(NAME(m_byte_offset));
-	save_item(NAME(m_motor_cmd));
 
-	save_item(NAME(m_disk_present));
-	save_item(NAME(m_motor_on));
-	save_item(NAME(m_ready));
-	save_item(NAME(m_write_gate));
-	save_item(NAME(m_write_protected));
+	save_item(NAME(m_ms));
+	save_item(NAME(m_mo));
+	save_item(NAME(m_ry));
+	save_item(NAME(m_wg));
+	save_item(NAME(m_wp));
 }
 
 void thomson_qdd_image_device::device_reset()
 {
-	m_motor_on = 0;
-	m_motor_cmd = 0;
-	m_ready = 0;
-	m_write_gate = 0;
+	m_mo = 1;
+	m_ry = 1;
+	m_wg = 0;
+	m_dirty = false;
+	m_byte_offset = 0;
 }
 
 /* fixed interlacing map for QDDs */
@@ -156,13 +155,12 @@ std::pair<std::error_condition, std::string> thomson_qdd_image_device::call_load
 	memset(dst, SYNC_CODE, QDD_TRACK_LEN - (int)(dst - org));
 	LOGIMG("load: ready range [ %d .. %d ]\n", QDD_HEAD_READ_SW_POS, QDD_MOTOR_STOP_SW_POS);
 
-	m_disk_present = 1;
-	m_write_protected = (is_readonly() ? 1 : 0);
+	m_ms = 0;
+	m_wp = is_readonly();
 	m_byte_offset = 0;
 	m_dirty = false;
-	LOGHW("%s [%d/%d] disk present\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN);
-	LOGHW("%s [%d/%d] write protect is %s\n", machine().time().to_string(),
-			m_byte_offset, QDD_TRACK_LEN, is_readonly() ? "on" : "off");
+	LOGHW("%s [%d/%d] media sense %d\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN, m_ms);
+	LOGHW("%s [%d/%d] write protect %d\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN, m_wp);
 
 	return std::make_pair(std::error_condition(), std::string());
 }
@@ -176,7 +174,7 @@ static void seek_sync_code(const uint8_t *src, int &pos, uint8_t val, bool &eos)
 static uint8_t get_next_byte(const uint8_t *src, int &pos, bool &eos)
 {
 	uint8_t val = 0;
-	if (pos < QDD_TRACK_LEN)
+	if(pos < QDD_TRACK_LEN)
 		val = src[pos++];
 	eos = (pos == QDD_TRACK_LEN);
 	return val;
@@ -184,13 +182,13 @@ static uint8_t get_next_byte(const uint8_t *src, int &pos, bool &eos)
 
 void thomson_qdd_image_device::call_unload()
 {
-	if (m_dirty)
+	if(m_dirty)
 		save();
 	if(m_track_buffer.get())
 		memset(m_track_buffer.get(), 0, QDD_TRACK_LEN);
-	motor_on_w(0);
-	m_disk_present = 0;
-	LOGHW("%s [%d/%d] media unset\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN);
+	mo_w(1);
+	m_ms = 1;
+	LOGHW("%s [%d/%d] media sense %d\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN, m_ms);
 }
 
 void thomson_qdd_image_device::save()
@@ -206,7 +204,7 @@ void thomson_qdd_image_device::save()
 		seek_sync_code(src, pos, SYNC_CODE, eos);
 		seek_sync_code(src, pos, SECTOR_HEADER_ID, eos);
 
-		if (eos) {
+		if(eos) {
 			LOGIMG("save: header id not found for sector %d at pos %d\n", i, pos);
 			break;
 		}
@@ -232,15 +230,15 @@ void thomson_qdd_image_device::save()
 			break;
 		}
 
-		if (get_next_byte(src, pos, eos) != SYNC_CODE)
+		if(get_next_byte(src, pos, eos) != SYNC_CODE)
 			break;
-		if (get_next_byte(src, pos, eos) != SYNC_CODE)
+		if(get_next_byte(src, pos, eos) != SYNC_CODE)
 			break;
-		if (get_next_byte(src, pos, eos) != SYNC_CODE)
+		if(get_next_byte(src, pos, eos) != SYNC_CODE)
 			break;
 		seek_sync_code(src, pos, SECTOR_DATA_ID, eos);
 
-		if (eos) {
+		if(eos) {
 			LOGIMG("save: data id not found for sector %d at pos %d\n", i, pos);
 			break;
 		}
@@ -251,7 +249,7 @@ void thomson_qdd_image_device::save()
 			crc += get_next_byte(src, pos, eos);
 		b1 = get_next_byte(src, pos, eos);
 
-		if (eos)
+		if(eos)
 			break;
 
 		fseek(QDD_SECTOR_LENGTH*thomson_qdd_map[i - 1], SEEK_SET);
@@ -277,12 +275,12 @@ void thomson_qdd_image_device::save()
 void thomson_qdd_image_device::write(uint8_t data)
 {
 	static int prev = -1;
-	if(m_motor_cmd && m_disk_present && m_ready && m_write_gate && !m_write_protected) {
+	if(!m_ms && !m_ry && m_wg && !m_wp) {
 		LOGWRITE("%s [%d/%d] write 0x%02x replace=0x%02x to the QDD\n", machine().time().to_string(),
 				m_byte_offset, QDD_TRACK_LEN, data, m_track_buffer[m_byte_offset]);
 		m_track_buffer[m_byte_offset] = data;
 		m_dirty = true;
-		if (m_byte_offset != prev + 1)
+		if(m_byte_offset != prev + 1)
 			LOGREAD("%s WARNING gap between two writes %d %d\n", machine().time().to_string(),
 				prev, m_byte_offset);
 	}
@@ -294,11 +292,11 @@ uint8_t thomson_qdd_image_device::read()
 	uint8_t val = 0;
 	static int prev = -1;
 
-	if(m_motor_cmd && m_disk_present && m_ready && m_byte_offset > QDD_DATA_RDY_POS) {
+	if(!m_ms && !m_ry && m_byte_offset > QDD_DATA_RDY_POS) {
 		LOGREAD("%s [%d/%d] read 0x%02x from the QDD\n", machine().time().to_string(),
 				m_byte_offset, QDD_TRACK_LEN, m_track_buffer[m_byte_offset]);
 		val = m_track_buffer[m_byte_offset];
-		if (m_byte_offset != prev + 1)
+		if(m_byte_offset != prev + 1)
 			LOGREAD("%s WARNING gap between two reads %d %d\n", machine().time().to_string(),
 				prev, m_byte_offset);
 	}
@@ -306,45 +304,30 @@ uint8_t thomson_qdd_image_device::read()
 	return val;
 }
 
-void thomson_qdd_image_device::motor_on_w(int state)
+void thomson_qdd_image_device::mo_w(int state)
 {
-	if(m_motor_on == state)
+	if(m_mo == state)
 		return;
-
-	m_motor_on = state;
-
-	LOGHW("%s [%d/%d] motor_on set %s\n", machine().time().to_string(),
-			m_byte_offset, QDD_TRACK_LEN, m_motor_on ? "on":"off");
-	if(m_motor_on)
+	m_mo = state;
+	if(!m_mo)
 		m_byte_timer->adjust(attotime::zero, 0, attotime::from_hz(QDD_BITRATE / 8));
-	if (m_motor_on && !m_motor_cmd) {
-		m_motor_cmd = 1;
-		LOGHW("%s [%d/%d] motor_cmd set on\n", machine().time().to_string(),
-					m_byte_offset, QDD_TRACK_LEN);
-	}
+	LOGHW("%s [%d/%d] motor %d\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN, m_mo);
 }
 
 TIMER_CALLBACK_MEMBER(thomson_qdd_image_device::byte_timer)
 {
-	int prev = m_ready;
+	int prev = m_ry;
 
-	m_ready = 0;
-	if(m_byte_offset > QDD_HEAD_READ_SW_POS && m_byte_offset < QDD_MOTOR_STOP_SW_POS)
-		m_ready = 1;
-	if(m_ready != prev)
-		LOGHW("%s [%d/%d] ready %s\n", machine().time().to_string(),
-				m_byte_offset, QDD_TRACK_LEN, m_ready ? "set" : "unset");
-	if(m_byte_offset >= QDD_MOTOR_STOP_SW_POS && m_motor_cmd == 1 && (m_motor_on == 0 || m_write_gate == 1)) {
-		m_motor_cmd = 0;
-		LOGHW("%s [%d/%d] motor_cmd set off\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN);
-		if (m_dirty)
-			save();
-	}
+	m_ry = (m_byte_offset <= QDD_HEAD_READ_SW_POS || m_byte_offset >= QDD_MOTOR_STOP_SW_POS);
 	m_byte_offset++;
 	if(m_byte_offset == QDD_TRACK_LEN) {
 		m_byte_offset = 0;
-		LOGHW("%s [%d/%d] end of track\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN);
-		if (m_motor_cmd == 0)
+		if(m_mo || m_wg)
 			m_byte_timer->adjust(attotime::never);
+		if(m_dirty)
+			save();
+		LOGHW("%s [%d/%d] end of track\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN);
 	}
+	if(m_ry != prev)
+		LOGHW("%s [%d/%d] ready %d\n", machine().time().to_string(), m_byte_offset, QDD_TRACK_LEN, m_ry);
 }
