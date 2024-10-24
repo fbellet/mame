@@ -378,9 +378,9 @@ bool wd177x_format::save(util::random_read_write &io, const std::vector<uint32_t
 		break;
 	}
 
-	// No match, pick the first one and be done with it
+	// No match, give up
 	if(chosen_candidate == -1)
-		chosen_candidate = 0;
+		return false;
 
 	const format &f = formats[chosen_candidate];
 
