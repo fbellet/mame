@@ -1127,7 +1127,7 @@ attotime floppy_image_device::get_next_transition(const attotime &from_when)
 	if(!m_cache_weak)
 		return m_cache_end_time;
 
-	// Put a flux transition in the middle of a 4us interval with a 50% probability
+	// Put a flux transition in the middle of a 4us interval with a 25% probability
 	uint64_t interval_index = (from_when < m_cache_weak_start) ? 0 : (from_when - m_cache_weak_start).as_ticks(250000);
 	attotime weak_time = m_cache_weak_start + attotime::from_ticks(interval_index*2+1, 500000);
 	for(;;) {
@@ -1135,7 +1135,7 @@ attotime floppy_image_device::get_next_transition(const attotime &from_when)
 			return m_cache_end_time;
 		if(weak_time > from_when) {
 			u32 test = hash32(hash32(hash32(hash32(m_revolution_count) ^ 0x4242) + m_cache_index) + interval_index);
-			if(test & 1)
+			if((test & 3) == 0)
 				return weak_time;
 		}
 		weak_time += attotime::from_usec(4);
