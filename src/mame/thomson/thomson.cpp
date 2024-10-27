@@ -1193,12 +1193,6 @@ void to9_state::to9(machine_config &config)
 	FLOPPY_CONNECTOR(config, m_floppy[0], wd2793_internal_drives, "35dd", wd2793_formats).enable_sound(true);
 	FLOPPY_CONNECTOR(config, m_floppy[1], wd2793_external_drives, "dd90_352", wd2793_formats).enable_sound(true);
 
-	m_extension->option_remove("cd90_015");
-	m_extension->option_remove("cq90_028");
-	m_extension->option_remove("cd90_351");
-	m_extension->option_remove("cd90_640");
-	m_extension->option_remove("nanoreseau");
-
 	CENTRONICS(config, m_centronics, centronics_devices, "printer");
 	m_centronics->busy_handler().set(FUNC(to9_state::write_centronics_busy));
 
@@ -1388,12 +1382,6 @@ void to9_state::to8(machine_config &config)
 	THMFC1_CONNECTOR(config, "thmfc1:0", thmfc1_external_drives, "dd90_352", thmfc1_formats).enable_sound(true);
 	THMFC1_CONNECTOR(config, "thmfc1:1", thmfc1_external_drives, "dd90_352", thmfc1_formats).enable_sound(true);
 
-	m_extension->option_remove("cd90_015");
-	m_extension->option_remove("cq90_028");
-	m_extension->option_remove("cd90_351");
-	m_extension->option_remove("cd90_640");
-	m_extension->option_remove("nanoreseau");
-
 	CENTRONICS(config, m_centronics, centronics_devices, "printer");
 	m_centronics->busy_handler().set(FUNC(to9_state::write_centronics_busy));
 
@@ -1539,12 +1527,6 @@ void to9_state::to9p(machine_config &config)
 	THMFC1(config, "thmfc1", 16_MHz_XTAL );
 	THMFC1_CONNECTOR(config, "thmfc1:0", thmfc1_internal_drives, "35dd", thmfc1_formats).enable_sound(true);
 	THMFC1_CONNECTOR(config, "thmfc1:1", thmfc1_external_drives, "dd90_352", thmfc1_formats).enable_sound(true);
-
-	m_extension->option_remove("cd90_015");
-	m_extension->option_remove("cq90_028");
-	m_extension->option_remove("cd90_351");
-	m_extension->option_remove("cd90_640");
-	m_extension->option_remove("nanoreseau");
 
 	CENTRONICS(config, m_centronics, centronics_devices, "printer");
 	m_centronics->busy_handler().set(FUNC(to9_state::write_centronics_busy));
