@@ -30,10 +30,10 @@ ROM_START(cd90_351)
 	// missing (and probably totally unimportant)
 
 	ROM_REGION( 0x2000, "rom", 0 )
-	ROM_LOAD ( "cd-351-0.rom", 0x0000, 0x7c0, CRC(2c0159fd) SHA1(bab5395ed8bc7c06f9897897f836054e6546e8e8) )
-	ROM_LOAD ( "cd-351-1.rom", 0x0800, 0x7c0, CRC(8e58d159) SHA1(dcf992c96e7556b2faee6bacd3f744e56998e6ea) )
-	ROM_LOAD ( "cd-351-2.rom", 0x1000, 0x7c0, CRC(c9228b60) SHA1(179e10107d5be91e684069dee80f94847b83201f) )
-	ROM_LOAD ( "cd-351-3.rom", 0x1800, 0x7c0, CRC(3ca8e5dc) SHA1(7118636fb5c597c78c2fce17b02aed5e4ba38635) )
+	ROM_LOAD ( "cd90-351-0.rom", 0x0000, 0x7c0, CRC(2c0159fd) SHA1(bab5395ed8bc7c06f9897897f836054e6546e8e8) )
+	ROM_LOAD ( "cd90-351-1.rom", 0x0800, 0x7c0, CRC(8e58d159) SHA1(dcf992c96e7556b2faee6bacd3f744e56998e6ea) )
+	ROM_LOAD ( "cd90-351-2.rom", 0x1000, 0x7c0, CRC(c9228b60) SHA1(179e10107d5be91e684069dee80f94847b83201f) )
+	ROM_LOAD ( "cd90-351-3.rom", 0x1800, 0x7c0, CRC(3ca8e5dc) SHA1(7118636fb5c597c78c2fce17b02aed5e4ba38635) )
 ROM_END
 
 void cd90_351_device::rom_map(address_map &map)
